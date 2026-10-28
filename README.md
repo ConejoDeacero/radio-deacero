@@ -128,7 +128,7 @@ La Pi no alcanza GitHub ni PyPI y `sudo` pide contraseña, así que todo vive en
 | Node 22 | `~/.local/lib/node` (enlace `~/.local/bin/node`) |
 | yt-dlp (copiado desde el PC, Python puro) | `~/.local/lib/ytdlp` + wrapper `~/.local/bin/yt-dlp` |
 | App | `~/DEACEROPLAY-lite` |
-| Servicio (usuario) | `~/.config/systemd/user/play-lite.service` — `systemctl --user status\|restart play-lite` |
+| Servicio (usuario) | `~/.config/systemd/user/play-lite.service` (copia de `deploy/play-lite.user.service`) — `systemctl --user status\|restart play-lite` |
 | Configuración y clave de red | `~/.config/play-lite.env` (`HOST`, `REMOTE_TOKEN`, `DATA_DIR`) |
 | Podcasts e historial | `~/.local/share/play-lite/podcasts.json` y `history.json` |
 | Pantalla completa al encender | `~/.config/autostart/play-lite-kiosk.desktop` → `deploy/start-kiosk.sh` |
@@ -148,7 +148,7 @@ La solución definitiva es una **reserva DHCP** en el router (pide a quien admin
 
 **Actualizar la app** (desde el PC, en la carpeta del proyecto):
 ```bash
-tar -cf - . | ssh admin@IP 'tar -xmf - -C ~/DEACEROPLAY-lite' && ssh admin@IP 'systemctl --user restart play-lite'
+tar --exclude=.git --exclude=test --exclude=docs -cf - . | ssh admin@IP 'tar -xmf - -C ~/DEACEROPLAY-lite' && ssh admin@IP 'systemctl --user restart play-lite'
 ```
 **Actualizar yt-dlp** (la Pi no puede bajarlo; si las pistas dejan de sonar suele ser esto). En el PC: `pip install -U yt-dlp`, y
 ```bash
@@ -158,7 +158,6 @@ tar --exclude=__pycache__ -cf - yt_dlp | ssh admin@IP 'rm -rf ~/.local/lib/ytdlp
 **Detener / quitar:** `~/DEACEROPLAY-lite/deploy/stop-kiosk.sh` · `rm ~/.config/autostart/play-lite-kiosk.desktop` · `systemctl --user disable --now play-lite`.
 `deploy/start-kiosk.sh` acepta `KIOSK_EXTRA_FLAGS` (p. ej. `--remote-debugging-port=9222` para depurar).
 
-Con `sudo` y acceso a GitHub se puede usar en su lugar `deploy/play-lite.service` + `yt-dlp-update.timer` (servicio del sistema y actualización diaria).
 Si la pantalla se apaga sola: `sudo raspi-config` → Display Options → Screen Blanking → No.
 El reloj de esta Pi iba ~3 h atrasado (NTP bloqueado); la app lo tolera (si una URL caduca antes de tiempo, reintenta).
 
@@ -189,7 +188,7 @@ src/timesync.js      hora real (HTTPS)
 src/history.js       historial           src/jsonfile.js JSON en disco (atómico)
 src/lyrics.js        letras             src/thumb.js    carátulas
 public/              interfaz (HTML + CSS + JS, sin build): index.html (pantalla), remote.html (control)
-deploy/              play (CLI), start/stop-kiosk.sh, install-autostart.sh, unidades systemd
+deploy/              play (CLI), start/stop-kiosk.sh, install-autostart.sh, play-lite.user.service
 data/genres.json     479 géneros        test/           node:test
 ```
 

@@ -48,4 +48,4 @@ function createTimeSync({ fetchImpl = fetch, now = Date.now, sources = DEFAULT_S
   return { sync, current, info, start };
 }
 
-module.exports = { createTimeSync, DEFAULT_SOURCES };
+module.exports = { createTimeSync };
