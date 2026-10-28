@@ -20,13 +20,15 @@ param(
   [switch]$NoAutostart,    # no crear accesos en Inicio (pruebas)
   [switch]$NoStart,        # no arrancar al terminar
   [switch]$LocalOnly,      # solo este equipo (sin control desde la red)
-  [string]$StartupDir = [Environment]::GetFolderPath('Startup')
+  [string]$StartupDir = [Environment]::GetFolderPath('Startup'),
+  [string]$LogFile = ''    # guarda todo lo que se muestra en este archivo (lo usa INSTALAR.cmd)
 )
 
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $ProgressPreference = 'SilentlyContinue'   # Invoke-WebRequest mucho mas rapido
 
+if ($LogFile) { Start-Transcript -Path $LogFile -Force | Out-Null }
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $source = (Resolve-Path (Join-Path $here '..\..')).Path
 function Say($m) { Write-Host "  $m" }
@@ -49,7 +51,15 @@ function Stop-Radio {
 Step 'Preparando la carpeta'
 Stop-Radio -Dir $InstallDir
 foreach ($d in @('', 'app', 'bin', 'logs', 'data')) { New-Item -ItemType Directory -Force -Path (Join-Path $InstallDir $d) | Out-Null }
+New-Item -ItemType Directory -Force -Path (Join-Path $InstallDir 'radio-kiosk-profile') | Out-Null
 Say "Carpeta de instalacion: $InstallDir"
+$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if ($isAdmin) {
+  # Instalado por un administrador (p. ej. en ProgramData), la app corre luego con el usuario que inicie sesion, que puede no ser administrador:
+  # necesita escribir sus datos, su log y el perfil del navegador. S-1-5-32-545 = grupo "Usuarios" (funciona en cualquier idioma de Windows).
+  foreach ($d in @('data', 'logs', 'radio-kiosk-profile')) { & icacls (Join-Path $InstallDir $d) /grant '*S-1-5-32-545:(OI)(CI)M' /Q | Out-Null }
+  Say 'Permisos de escritura dados al grupo Usuarios en data, logs y el perfil del navegador.'
+}
 
 # ---------------------------------------------------------------- Node
 Step 'Node.js'
@@ -61,6 +71,12 @@ if ($sys) {
 }
 if (-not $nodePath) {
   $portable = Join-Path $InstallDir 'node\node.exe'
+  $vendorNode = Join-Path $source 'vendor\node'
+  if (-not (Test-Path $portable) -and (Test-Path (Join-Path $vendorNode 'node.exe'))) {
+    Say 'Se usa el Node incluido en el paquete (sin descargar).'
+    if (Test-Path (Join-Path $InstallDir 'node')) { Remove-Item (Join-Path $InstallDir 'node') -Recurse -Force }
+    Copy-Item $vendorNode (Join-Path $InstallDir 'node') -Recurse -Force
+  }
   if (-not (Test-Path $portable)) {
     Say 'No hay Node 18 o mayor: se descarga una copia portatil (nodejs.org)...'
     $ver = 'v22.11.0'
@@ -94,6 +110,8 @@ if (-not $ytOk) {
 }
 if (-not $ytOk) {
   $exe = Join-Path $InstallDir 'bin\yt-dlp.exe'
+  $vendorYt = Join-Path $source 'vendor\bin\yt-dlp.exe'
+  if (Test-Path $vendorYt) { Say 'Se usa el yt-dlp incluido en el paquete (sin descargar).'; Copy-Item $vendorYt $exe -Force }
   if (-not (Test-Path $exe)) {
     Say 'Se descarga yt-dlp.exe (GitHub)...'
     try { Invoke-WebRequest -UseBasicParsing 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe' -OutFile $exe }
@@ -105,7 +123,7 @@ if (-not $ytOk) { Say 'AVISO: sin yt-dlp la app arranca pero no puede reproducir
 
 # ---------------------------------------------------------------- app
 Step 'Copiando la aplicacion'
-$null = robocopy $source (Join-Path $InstallDir 'app') /MIR /NFL /NDL /NJH /NJS /NP /XD .git test docs node_modules /XF podcasts.json history.json .gitignore .gitattributes
+$null = robocopy $source (Join-Path $InstallDir 'app') /MIR /NFL /NDL /NJH /NJS /NP /XD .git test docs node_modules vendor /XF podcasts.json history.json .gitignore .gitattributes
 if ($LASTEXITCODE -ge 8) { throw "robocopy fallo (codigo $LASTEXITCODE)" }
 Say "App copiada a $InstallDir\app"
 Copy-Item (Join-Path $here 'run-server.ps1') (Join-Path $InstallDir 'run-server.ps1') -Force
@@ -197,3 +215,4 @@ if (-not $LocalOnly) {
   Say "Clave de control remoto: $Token"
 }
 Say "Logs: $InstallDir\logs\server.log   |   Quitar: powershell -ExecutionPolicy Bypass -File `"$here\uninstall.ps1`""
+if ($LogFile) { Stop-Transcript | Out-Null }

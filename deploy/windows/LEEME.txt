@@ -1,0 +1,19 @@
+DEACERO Play Lite - instalacion en un PC con Windows
+====================================================
+
+INSTALAR (2 minutos)
+  1. Descomprime esta carpeta en el PC (por ejemplo en C:\Temp\radio-deacero).
+  2. Haz doble clic en INSTALAR.cmd y acepta el aviso de administrador de Windows.
+  3. Espera el mensaje "Listo": ahi aparecen las direcciones y la CLAVE del control remoto. Anotala.
+
+Que hace: instala en C:\ProgramData\RadioDeacero para todos los usuarios, abre la pantalla completa (vista con el video
+difuminado de fondo y la hora grande) y deja que arranque sola al iniciar sesion. Abre el puerto 8000 en el firewall
+para poder controlarla desde otros equipos de la red. Trae Node y yt-dlp incluidos: no necesita descargar nada para instalar,
+pero SI necesita salida a internet (YouTube) para reproducir musica.
+
+CONTROL REMOTO (desde cualquier equipo de la red, celular o PC):
+  http://IP-DE-ESTE-PC:8000/remote?t=CLAVE
+
+SALIR DE LA PANTALLA COMPLETA: Alt+F4 (se vuelve a abrir sola). Para quitar todo: DESINSTALAR.cmd.
+ACTUALIZAR: volver a ejecutar INSTALAR.cmd con la version nueva (conserva la clave).
+PROBLEMAS: el registro esta en C:\ProgramData\RadioDeacero\logs\server.log y la instalacion en %TEMP%\radio-deacero-install.log

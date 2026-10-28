@@ -163,7 +163,13 @@ El reloj de esta Pi iba ~3 h atrasado (NTP bloqueado); la app lo tolera (si una 
 
 ## Instalar en un PC con Windows (sin administrador)
 
-Sirve igual que la Raspberry Pi: un PC con monitor (o solo servidor) que arranca solo al iniciar sesión. Desde la carpeta del proyecto:
+Sirve igual que la Raspberry Pi: un PC con monitor (o solo servidor) que arranca solo al iniciar sesión.
+
+**Forma fácil (para quien tenga permisos de administrador en ese PC):** copiar el paquete (`radio-deacero-windows.zip`), descomprimirlo y hacer doble clic en
+`INSTALAR.cmd` (pide el aviso de administrador una vez). Instala para **todos los usuarios** en `C:\ProgramData\RadioDeacero`, abre la pantalla completa con la vista `/kiosco`
+(video difuminado + hora grande), abre el puerto en el firewall y muestra las direcciones y la clave. `DESINSTALAR.cmd` lo quita; `LEEME.txt` trae los pasos. El paquete lleva Node y
+`yt-dlp` incluidos en `vendor\` (verificados contra los hashes oficiales), así que instalar no necesita internet (reproducir sí). El zip se arma a partir de este repositorio añadiendo `vendor\`
+(no está versionado). Sin ser administrador se puede instalar solo para el usuario actual con `install.ps1`, como sigue. Desde la carpeta del proyecto:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File deploy\windows\install.ps1
@@ -216,7 +222,7 @@ src/history.js       historial           src/jsonfile.js JSON en disco (atómico
 src/lyrics.js        letras             src/thumb.js    carátulas
 public/              interfaz (HTML + CSS + JS, sin build): index.html (pantalla), remote.html (control)
 deploy/              play (CLI), start/stop-kiosk.sh, install-autostart.sh, play-lite.user.service (Raspberry Pi)
-deploy/windows/      install.ps1, uninstall.ps1, run-server.ps1, run-kiosk.ps1 (PC con Windows)
+deploy/windows/      INSTALAR.cmd, DESINSTALAR.cmd, LEEME.txt, install.ps1, uninstall.ps1, run-server.ps1, run-kiosk.ps1 (PC con Windows)
 data/genres.json     479 géneros        test/           node:test
 ```
 
