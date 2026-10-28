@@ -194,6 +194,8 @@ completa en Edge o Chrome con un perfil propio); arranca todo y muestra las dire
 - **Actualizar a mano:** volver a ejecutar `install.ps1` (para el servidor viejo, pone el nuevo y conserva clave, puerto, vista y modo). **Quitar:** `uninstall.ps1` (`-KeepData` conserva podcasts e historial).
 - **Control desde otros equipos:** sin ser administrador Windows puede preguntar si permite la conexión la primera vez (aceptar), o crear la regla una vez como administrador
   (el instalador imprime el comando; si se ejecuta ya como administrador la crea solo).
+- **Detener sin desinstalar:** `powershell -ExecutionPolicy Bypass -File "%LOCALAPPDATA%\RadioDeacero\detener.ps1"`. Cerrar el navegador no basta: `run-kiosk.ps1` lo reabre a los 3 s. Este script para el servidor y la pantalla
+  (con todo su árbol) hasta el próximo inicio de sesión; para quitarlos de forma permanente, `uninstall.ps1`.
 - **Autorun con tarea programada:** `powershell -ExecutionPolicy Bypass -File deploy\windows\autorun.ps1` crea dos tareas (`RadioDeacero-Servidor` y `RadioDeacero-Pantalla`) que
   se lanzan al iniciar sesión el usuario actual, con una espera para que la red esté lista, y quita los accesos de Inicio para no arrancar dos veces. No pide administrador; si Windows no deja crearlas,
   conserva los accesos de Inicio. `-Remove` quita las tareas. Para que arranque «en cuanto se prende» el PC debe iniciar sesión solo (inicio de sesión automático, lo configura IT): sin sesión no hay pantalla.

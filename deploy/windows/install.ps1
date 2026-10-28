@@ -141,6 +141,7 @@ Say "App copiada a $InstallDir\app"
 Copy-Item (Join-Path $here 'run-server.ps1') (Join-Path $InstallDir 'run-server.ps1') -Force
 Copy-Item (Join-Path $here 'run-kiosk.ps1') (Join-Path $InstallDir 'run-kiosk.ps1') -Force
 Copy-Item (Join-Path $here 'update.ps1') (Join-Path $InstallDir 'update.ps1') -Force
+Copy-Item (Join-Path $here 'detener.ps1') (Join-Path $InstallDir 'detener.ps1') -Force
 
 # ---------------------------------------------------------------- configuracion (se conserva la clave al actualizar)
 Step 'Configuracion'
