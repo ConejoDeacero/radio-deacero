@@ -245,6 +245,7 @@ body[data-mode="video"] #vis { opacity: .55; }
 body[data-view="kiosco"] .glow, body[data-view="kiosco"] .top, body[data-view="kiosco"] .info,
 body[data-view="kiosco"] .progress-row, body[data-view="kiosco"] .transport, body[data-view="kiosco"] .volume-row,
 body[data-view="kiosco"] .actions { display: none; }
+body[data-view="kiosco"] { grid-template-rows: minmax(0, 1fr); } /* sin encabezado: una sola fila a pantalla completa (si no, el contenido queda arriba) */
 body[data-view="kiosco"] .bg { display: block; position: fixed; inset: 0; z-index: 0; overflow: hidden; background: #000; }
 body[data-view="kiosco"] .bg canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: auto; transform: scale(1.12); }
 body[data-view="kiosco"] .bg-dim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.38), rgba(0,0,0,.55) 55%, rgba(0,0,0,.72)); }
@@ -252,7 +253,7 @@ body[data-view="kiosco"] .bg-dim { position: absolute; inset: 0; background: lin
 /* La carátula/video del reproductor sigue existiendo (el video debe seguir decodificándose) pero invisible y mínimo */
 body[data-view="kiosco"] .art { position: fixed; left: 0; bottom: 0; width: 2px; height: 2px; opacity: 0; pointer-events: none; overflow: hidden; box-shadow: none; z-index: -1; }
 
-body[data-view="kiosco"] .stage { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; align-content: center; justify-items: center; gap: clamp(.6em, 3vh, 1.8em); text-align: center; }
+body[data-view="kiosco"] .stage { height: 100%; overflow: hidden; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; align-content: center; justify-items: center; gap: clamp(.6em, 3vh, 1.8em); text-align: center; }
 body[data-view="kiosco"] .clockbox { display: flex; flex-direction: column; align-items: center; }
 body[data-view="kiosco"] .clock {
   font-size: clamp(3rem, min(14vw, 22vh), 10rem); font-weight: 800; letter-spacing: -.04em; line-height: 1.05; color: #fff;
