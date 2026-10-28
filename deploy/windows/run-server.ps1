@@ -1,6 +1,7 @@
 # run-server.ps1 - arranca el servidor y lo relanza si se cae. Lo copia install.ps1 a <InstallDir>.
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $cfg = Get-Content (Join-Path $root 'config.json') -Raw | ConvertFrom-Json
+$PID | Set-Content -Path (Join-Path $root 'run-server.pid') -Encoding ASCII   # para que install/uninstall lo paren sin consultar procesos (sin administrador no se puede)
 
 $env:PORT = [string]$cfg.port
 $env:HOST = [string]$cfg.host

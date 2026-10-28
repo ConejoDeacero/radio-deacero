@@ -14,6 +14,15 @@ $leaf = Split-Path $InstallDir -Leaf
 Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
   Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -and $_.CommandLine -like "*$leaf*" -and $_.Name -match 'powershell|node|msedge|chrome' -and ($_.CommandLine -match 'run-server|run-kiosk|server\.js|radio-kiosk-profile') } |
   ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch { } }
+# Sin administrador no se pueden consultar procesos: se paran por el PID que guardan run-server/run-kiosk (ver install.ps1).
+foreach ($n in @('run-server.pid', 'run-kiosk.pid')) {
+  $f = Join-Path $InstallDir $n
+  if (-not (Test-Path $f)) { continue }
+  $pidNum = 0
+  if (-not [int]::TryParse((Get-Content $f -Raw).Trim(), [ref]$pidNum)) { continue }
+  $p = Get-Process -Id $pidNum -ErrorAction SilentlyContinue
+  if ($p -and $pidNum -ne $PID -and $p.ProcessName -eq 'powershell' -and $p.StartTime -le (Get-Item $f).LastWriteTime.AddSeconds(5)) { & cmd /c "taskkill /F /T /PID $pidNum >nul 2>nul" }
+}
 Start-Sleep -Seconds 1
 
 foreach ($t in @('RadioDeacero-Servidor', 'RadioDeacero-Pantalla')) {   # tareas de autorun.ps1 (si las hay)

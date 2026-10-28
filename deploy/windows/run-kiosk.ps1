@@ -26,6 +26,8 @@ $args = @('--kiosk', $url, '--edge-kiosk-type=fullscreen', "--user-data-dir=$pro
 
 if ($DryRun) { Write-Host "Navegador: $browser"; Write-Host "Direccion: $url"; Write-Host "Argumentos: $($args -join ' ')"; exit 0 }
 
+$PID | Set-Content -Path (Join-Path $root 'run-kiosk.pid') -Encoding ASCII   # para que install/uninstall lo paren sin consultar procesos
+
 # esperar al servidor (evita abrir una pagina de error al iniciar sesion)
 while ($true) {
   try { $r = Invoke-RestMethod -UseBasicParsing "http://127.0.0.1:$($cfg.port)/api/health" -TimeoutSec 2; if ($r.ok) { break } } catch { }
