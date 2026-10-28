@@ -161,6 +161,33 @@ tar --exclude=__pycache__ -cf - yt_dlp | ssh admin@IP 'rm -rf ~/.local/lib/ytdlp
 Si la pantalla se apaga sola: `sudo raspi-config` → Display Options → Screen Blanking → No.
 El reloj de esta Pi iba ~3 h atrasado (NTP bloqueado); la app lo tolera (si una URL caduca antes de tiempo, reintenta).
 
+## Instalar en un PC con Windows (sin administrador)
+
+Sirve igual que la Raspberry Pi: un PC con monitor (o solo servidor) que arranca solo al iniciar sesión. Desde la carpeta del proyecto:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy\windows\install.ps1
+```
+
+| Opción | Para qué |
+|---|---|
+| `-View kiosco` | pantalla con el video difuminado de fondo y la hora grande (por defecto, el reproductor normal) |
+| `-Mode video` | arrancar con video (por defecto, solo música) |
+| `-NoKiosk` | solo servidor: no abre el navegador en pantalla completa |
+| `-LocalOnly` | solo ese equipo (sin control desde la red ni clave) |
+| `-Port 8000` · `-Token CLAVE` · `-InstallDir ruta` | puerto, clave del control remoto (si se omite se genera una) y carpeta (por defecto `%LOCALAPPDATA%\RadioDeacero`) |
+| `-NoAutostart` · `-NoStart` | no crear los accesos de Inicio / no arrancar al terminar (pruebas) |
+
+Qué hace: usa el Node (≥ 18) y el `yt-dlp` que ya haya o descarga copias portátiles (nodejs.org y GitHub; si GitHub está bloqueado, `python -m pip install -U yt-dlp`); copia la app
+a `<carpeta>\app` y guarda podcasts e historial aparte en `<carpeta>\data`; crea dos accesos en la carpeta **Inicio** del usuario (el servidor, que se relanza solo si se cae, y la pantalla
+completa en Edge o Chrome con un perfil propio); arranca todo y muestra las direcciones y la **clave**. Los logs quedan en `<carpeta>\logs\server.log`.
+
+- **Actualizar:** volver a ejecutar `install.ps1` (para el servidor viejo, pone el nuevo y conserva clave, puerto, vista y modo). **Quitar:** `uninstall.ps1` (`-KeepData` conserva podcasts e historial).
+- **Control desde otros equipos:** sin ser administrador Windows puede preguntar si permite la conexión la primera vez (aceptar), o crear la regla una vez como administrador
+  (el instalador imprime el comando; si se ejecuta ya como administrador la crea solo).
+- **Pantalla completa:** se sale con `Alt+F4`, pero se reabre sola; para pararla del todo, `uninstall.ps1` o cerrar sesión. La hora de la vista `/kiosco` es la del PC.
+- El comando `play` (control por terminal) necesita Python; la web `/remote` funciona sin nada más.
+
 ## Cómo funciona
 
 ```
@@ -188,7 +215,8 @@ src/timesync.js      hora real (HTTPS)
 src/history.js       historial           src/jsonfile.js JSON en disco (atómico)
 src/lyrics.js        letras             src/thumb.js    carátulas
 public/              interfaz (HTML + CSS + JS, sin build): index.html (pantalla), remote.html (control)
-deploy/              play (CLI), start/stop-kiosk.sh, install-autostart.sh, play-lite.user.service
+deploy/              play (CLI), start/stop-kiosk.sh, install-autostart.sh, play-lite.user.service (Raspberry Pi)
+deploy/windows/      install.ps1, uninstall.ps1, run-server.ps1, run-kiosk.ps1 (PC con Windows)
 data/genres.json     479 géneros        test/           node:test
 ```
 
