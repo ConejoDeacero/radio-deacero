@@ -526,6 +526,7 @@
     if (e.target.matches('input[type="search"], input[type="text"]')) { if (e.key === 'Escape') closeSheet(); return; }
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     const k = e.key;
+    if (VIEW === 'kiosco') return; /* solo vista: todo se maneja desde /remote */
     if (k === 'Escape') { closeSheet(); closeLyrics(); return; }
     if (k === ' ') { e.preventDefault(); toggle(); }
     else if (k === 'ArrowRight' || k === 'n' || k === 'N') advance();

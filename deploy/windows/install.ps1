@@ -128,6 +128,7 @@ if ($LASTEXITCODE -ge 8) { throw "robocopy fallo (codigo $LASTEXITCODE)" }
 Say "App copiada a $InstallDir\app"
 Copy-Item (Join-Path $here 'run-server.ps1') (Join-Path $InstallDir 'run-server.ps1') -Force
 Copy-Item (Join-Path $here 'run-kiosk.ps1') (Join-Path $InstallDir 'run-kiosk.ps1') -Force
+Copy-Item (Join-Path $here 'update.ps1') (Join-Path $InstallDir 'update.ps1') -Force
 
 # ---------------------------------------------------------------- configuracion (se conserva la clave al actualizar)
 Step 'Configuracion'
@@ -163,7 +164,10 @@ function New-Startup($name, $script) {
   $sh.Save()
   Say "Acceso creado: $lnk"
 }
+& cmd /c 'schtasks /Query /TN RadioDeacero-Servidor >nul 2>nul'
+$hasTasks = ($LASTEXITCODE -eq 0)   # autorun.ps1 ya lo dejo como tarea programada: con accesos de Inicio tambien arrancaria dos veces
 if ($NoAutostart) { Say 'Omitido (-NoAutostart).' }
+elseif ($hasTasks) { Say 'Ya arranca por tarea programada (autorun.ps1): no se crean accesos de Inicio.' }
 else {
   New-Item -ItemType Directory -Force -Path $StartupDir | Out-Null
   New-Startup 'RadioDeacero-Servidor' (Join-Path $InstallDir 'run-server.ps1')

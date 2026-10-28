@@ -31,10 +31,10 @@ cierra a la fuerza y no siempre guarda el último modo elegido, así que el par�
 | Dirección | Vista |
 |---|---|
 | `/` | Reproductor normal: carátula o video a un lado, controles al otro. |
-| `/kiosco` | **Vista kiosco**: el video de fondo a pantalla completa, **muy difuminado** (se ven manchas de color en movimiento, no la imagen), y la **hora en grande al frente** (12 h con AM/PM, segundos y fecha, como el kiosco original). Mismo reproductor y mismos controles; también obedece al control remoto. Con `?mode=audio` el fondo es la carátula difuminada en vez del video. |
+| `/kiosco` | **Vista kiosco, solo para ver**: el video de fondo a pantalla completa, difuminado (se distingue el video, sin detalle), y al frente la **hora en grande** (12 h con AM/PM, segundos y fecha), la canción y la que sigue. No tiene botones, barra de progreso, volumen, género ni dirección de control, y el teclado no hace nada: todo se maneja desde `/remote` (o `play`). Con `?mode=audio` el fondo es la carátula difuminada en vez del video. |
 
-El desenfoque no usa `filter: blur` (a 1080p hace tropezar a una Raspberry Pi): el video se dibuja en un mosaico de 32×18 px y el navegador lo escala a pantalla
-completa. Medido en una Pi 4B: video a 30 fps, 0 % de cuadros perdidos y ~19 % de CPU.
+El desenfoque no usa `filter: blur` (a 1080p hace tropezar a una Raspberry Pi): el video se dibuja en un mosaico de 96×54 px y el navegador lo escala a pantalla
+completa. (Con 32×18 px se veían solo manchas; con 96×54 se reconoce la imagen.) La medición de una Pi 4B (30 fps, ~19 % de CPU) fue con 32×18 y no se repitió con 96×54.
 
 **La hora está corregida:** una Pi sin reloj de hardware (y con NTP bloqueado) se atrasa —la de pruebas iba **7 días** atrasada—, y un reloj enorme en pantalla lo
 delataría. El servidor calcula el desfase con la cabecera `Date` de las respuestas HTTPS de YouTube/Google (`src/timesync.js`, cada 10 min) y la vista kiosco
@@ -188,9 +188,15 @@ Qué hace: usa el Node (≥ 18) y el `yt-dlp` que ya haya o descarga copias port
 a `<carpeta>\app` y guarda podcasts e historial aparte en `<carpeta>\data`; crea dos accesos en la carpeta **Inicio** del usuario (el servidor, que se relanza solo si se cae, y la pantalla
 completa en Edge o Chrome con un perfil propio); arranca todo y muestra las direcciones y la **clave**. Los logs quedan en `<carpeta>\logs\server.log`.
 
-- **Actualizar:** volver a ejecutar `install.ps1` (para el servidor viejo, pone el nuevo y conserva clave, puerto, vista y modo). **Quitar:** `uninstall.ps1` (`-KeepData` conserva podcasts e historial).
+- **Bajar cambios:** `powershell -ExecutionPolicy Bypass -File "%LOCALAPPDATA%\RadioDeacero\update.ps1"` (el instalador lo copia a la carpeta de instalación). Baja el zip de la rama `main` de GitHub
+  (repo público, sin Git ni credenciales) y lo instala encima: conserva clave, puerto, vista, modo, podcasts e historial. `-UpdateYtDlp` actualiza también `yt-dlp.exe`; `-NoStart` no arranca al terminar.
+  Hay que haber subido antes los cambios a GitHub. Si el equipo no llega a GitHub, copiar el zip y ejecutar `install.ps1`.
+- **Actualizar a mano:** volver a ejecutar `install.ps1` (para el servidor viejo, pone el nuevo y conserva clave, puerto, vista y modo). **Quitar:** `uninstall.ps1` (`-KeepData` conserva podcasts e historial).
 - **Control desde otros equipos:** sin ser administrador Windows puede preguntar si permite la conexión la primera vez (aceptar), o crear la regla una vez como administrador
   (el instalador imprime el comando; si se ejecuta ya como administrador la crea solo).
+- **Autorun con tarea programada:** `powershell -ExecutionPolicy Bypass -File deploy\windows\autorun.ps1` crea dos tareas (`RadioDeacero-Servidor` y `RadioDeacero-Pantalla`) que
+  se lanzan al iniciar sesión el usuario actual, con una espera para que la red esté lista, y quita los accesos de Inicio para no arrancar dos veces. No pide administrador; si Windows no deja crearlas,
+  conserva los accesos de Inicio. `-Remove` quita las tareas. Para que arranque «en cuanto se prende» el PC debe iniciar sesión solo (inicio de sesión automático, lo configura IT): sin sesión no hay pantalla.
 - **Pantalla completa:** se sale con `Alt+F4`, pero se reabre sola; para pararla del todo, `uninstall.ps1` o cerrar sesión. La hora de la vista `/kiosco` es la del PC.
 - El comando `play` (control por terminal) necesita Python; la web `/remote` funciona sin nada más.
 

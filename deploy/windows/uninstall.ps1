@@ -16,6 +16,10 @@ Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
   ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch { } }
 Start-Sleep -Seconds 1
 
+foreach ($t in @('RadioDeacero-Servidor', 'RadioDeacero-Pantalla')) {   # tareas de autorun.ps1 (si las hay)
+  $null = schtasks /Query /TN $t 2>&1
+  if ($LASTEXITCODE -eq 0) { $null = schtasks /Delete /TN $t /F 2>&1; Say "Tarea quitada: $t" }
+}
 foreach ($n in @('RadioDeacero-Servidor.lnk', 'RadioDeacero-Pantalla.lnk')) {
   $f = Join-Path $StartupDir $n
   if (Test-Path $f) { Remove-Item $f -Force; Say "Acceso quitado: $f" }
