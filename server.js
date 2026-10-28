@@ -11,6 +11,7 @@ const { createControl } = require('./src/control');
 const { createPodcasts, episodeQuery } = require('./src/podcasts');
 const { createClients } = require('./src/clients');
 const { createHistory } = require('./src/history');
+const { createTimeSync } = require('./src/timesync');
 const genres = require('./data/genres.json');
 
 const PORT = Number(process.env.PORT) || 8000;
@@ -23,6 +24,8 @@ const ytdlp = createYtdlp({ extraArgs, ...(process.env.YTDLP_BIN ? { cmd: { cmd:
 const radio = createRadio({ genres, search: (q, n) => ytdlp.search(q, n) });
 const proxy = createProxy({ resolve: (id, mode) => ytdlp.resolve(id, mode), invalidate: (id) => ytdlp.invalidate(id) });
 
+const timesync = createTimeSync(); /* hora real vía cabecera Date de HTTPS: la Pi puede tener el reloj atrasado */
+
 const server = createServer({
   publicDir: path.join(__dirname, 'public'),
   genres, ytdlp, radio, proxy,
@@ -31,6 +34,7 @@ const server = createServer({
   control: createControl(),
   clients: createClients(),
   history: createHistory({ dir: DATA_DIR }),
+  timesync,
   podcasts: createPodcasts({ dir: DATA_DIR }),
   /* episodios: de 5 min a 4 h */
   episodes: (q, n) => ytdlp.search(episodeQuery(q), n, { minSec: 300 }),
@@ -46,6 +50,7 @@ const server = createServer({
   console.log(ytdlp.isReady()
     ? `  ✓ yt-dlp ${ytdlp.version() || ''}`
     : '  ✗ yt-dlp no encontrado — instálalo (ver README)');
+  timesync.start();
   server.listen(PORT, HOST, () => {
     console.log(`  DEACERO Play Lite → http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}   (control remoto: /remote)`);
     if (HOST !== '127.0.0.1' && !TOKEN) console.log('  ⚠ Accesible desde la red SIN clave: define REMOTE_TOKEN');

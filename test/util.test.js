@@ -55,3 +55,12 @@ test('todos los emoji de data/genres.json tienen su SVG en public/assets/emoji',
   }
   assert.deepEqual(missing, []);
 });
+
+test('clockParts: hora de 12 h con AM/PM y fecha en español (como el kiosco anterior)', () => {
+  const { clockParts } = require('../public/js/util');
+  assert.deepEqual(clockParts(new Date(2026, 9, 29, 15, 7, 9).getTime()), { time: '03:07:09', ampm: 'PM', date: 'jueves, 29 de octubre' });
+  assert.deepEqual(clockParts(new Date(2026, 9, 28, 0, 5, 0).getTime()), { time: '12:05:00', ampm: 'AM', date: 'miércoles, 28 de octubre' }, 'medianoche = 12 AM');
+  assert.equal(clockParts(new Date(2026, 0, 1, 12, 0, 0).getTime()).time, '12:00:00', 'mediodía = 12 PM');
+  assert.equal(clockParts(new Date(2026, 0, 1, 12, 0, 0).getTime()).ampm, 'PM');
+  assert.equal(clockParts(new Date(2026, 11, 31, 23, 59, 59).getTime()).date, 'jueves, 31 de diciembre');
+});

@@ -7,6 +7,9 @@
   const media = $('media');   /* audio: siempre suena; es el reloj maestro */
   const vid = $('vid');       /* video sin sonido: solo en modo video, sigue al audio */
   const params = new URLSearchParams(location.search);
+  /* Dos vistas con el mismo reproductor: la normal y /kiosco (video de fondo difuminado + reloj grande). */
+  const VIEW = /^\/kiosco\/?$/.test(location.pathname) || params.get('view') === 'kiosco' ? 'kiosco' : 'normal';
+  document.body.dataset.view = VIEW;
 
   const state = {
     mode: 'audio',
@@ -476,7 +479,7 @@
     }
     if (!playing && !any) { cancelAnimationFrame(visRaf); visRaf = 0; cx.clearRect(0, 0, w, h); }
   }
-  function startVis() { if (visOn && !visRaf && !matchMedia('(prefers-reduced-motion: reduce)').matches) visRaf = requestAnimationFrame(drawVis); }
+  function startVis() { if (VIEW === 'normal' && visOn && !visRaf && !matchMedia('(prefers-reduced-motion: reduce)').matches) visRaf = requestAnimationFrame(drawVis); }
 
   /* ── Media Session (teclas multimedia, pantalla de bloqueo) ── */
   function setMediaSession(item) {
@@ -584,6 +587,45 @@
     es.onmessage = (e) => { try { handleCommand(JSON.parse(e.data)); } catch (_) { /* orden mal formada */ } };
   }
 
+  /* ── vista kiosco: reloj y fondo ────────────────────────────── */
+  /* La Pi puede tener el reloj atrasado: el servidor da la hora real (la saca de HTTPS). Si no está sincronizado, se usa el reloj local. */
+  let timeOffset = 0;
+  async function syncTime() {
+    try {
+      const t0 = Date.now();
+      const j = await getJson('/api/time');
+      const t1 = Date.now();
+      timeOffset = j.synced ? j.now - Math.round((t0 + t1) / 2) : 0;
+    } catch (_) { /* se conserva el desfase anterior */ }
+  }
+  function tickClock() {
+    const p = U.clockParts(Date.now() + timeOffset);
+    $('clockTime').textContent = p.time;
+    $('clockAmPm').textContent = p.ampm;
+    $('clockDate').textContent = p.date;
+  }
+
+  const bgCanvas = $('bgCanvas');
+  const bgCtx = bgCanvas.getContext('2d', { alpha: false });
+  /* Dibuja el cuadro actual del video (o la carátula) en 32×18 px: el navegador lo escala a pantalla completa y queda difuminado. */
+  function drawBg() {
+    if (document.hidden) return;
+    let src = null, sw = 0, sh = 0;
+    if (state.mode === 'video' && vid.getAttribute('src') && vid.readyState >= 2 && vid.videoWidth) { src = vid; sw = vid.videoWidth; sh = vid.videoHeight; }
+    else { const img = $('artImg'); if (img.complete && img.naturalWidth) { src = img; sw = img.naturalWidth; sh = img.naturalHeight; } }
+    if (!src) return;
+    const W = bgCanvas.width, H = bgCanvas.height;
+    const k = Math.max(W / sw, H / sh);
+    bgCtx.drawImage(src, (W - sw * k) / 2, (H - sh * k) / 2, sw * k, sh * k);
+  }
+
+  if (VIEW === 'kiosco') {
+    syncTime().then(tickClock);
+    setInterval(syncTime, 10 * 60 * 1000);
+    setInterval(tickClock, 1000);
+    setInterval(drawBg, 100);
+  }
+
   /* ── dirección de la Pi en pantalla (para administrarla cuando cambia la IP) ── */
   let infoTimer = 0;
   function showInfo(ms) {
@@ -610,7 +652,7 @@
     vol.value = store.get('pl_vol', '80');
     applyVolume();
     /* ?mode=video|audio en la dirección manda (el kiosco se cierra a la fuerza y no siempre guarda el último modo). */
-    const startMode = params.get('mode') || store.get('pl_mode', 'audio');
+    const startMode = params.get('mode') || (VIEW === 'kiosco' ? 'video' : store.get('pl_mode', 'audio'));
     if (startMode === 'video') { state.mode = 'video'; setMode('video'); }
     try { state.genres = await getJson('/api/genres'); buildChips(); } catch (_) { /* el selector quedará vacío */ }
     connectEvents();

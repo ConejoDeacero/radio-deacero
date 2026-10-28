@@ -70,7 +70,7 @@ function localIps() {
   return out;
 }
 
-function createServer({ publicDir, genres, ytdlp, radio, proxy, thumbs, lyrics, control, clients, history, podcasts, episodes, token = '', trustLoopback = true }) {
+function createServer({ publicDir, genres, ytdlp, radio, proxy, thumbs, lyrics, control, clients, history, podcasts, episodes, timesync, token = '', trustLoopback = true }) {
   const publicList = genres.map(({ id, label, emoji, color, featured }) => ({ id, label, emoji, color, featured: !!featured }));
   const root = path.resolve(publicDir);
 
@@ -81,6 +81,7 @@ function createServer({ publicDir, genres, ytdlp, radio, proxy, thumbs, lyrics, 
 
   function serveStatic(pathname, res) {
     if (pathname === '/remote') pathname = '/remote.html'; /* control remoto */
+    if (pathname === '/kiosco' || pathname === '/kiosco/') pathname = '/index.html'; /* misma página; la vista la elige app.js por la ruta */
     let rel;
     try { rel = decodeURIComponent(pathname); } catch { return json(res, 400, { error: 'URL inválida' }); }
     if (rel.includes('\0') || rel.includes('\\')) return json(res, 400, { error: 'URL inválida' });
@@ -123,6 +124,7 @@ function createServer({ publicDir, genres, ytdlp, radio, proxy, thumbs, lyrics, 
 
     if (p === '/api/health') return json(res, 200, { ok: true, ytdlp: ytdlp.version(), uptime: Math.round(process.uptime()), ips: localIps() });
     if (p === '/api/genres') return json(res, 200, publicList);
+    if (p === '/api/time') { const i = timesync.info(); return json(res, 200, { now: timesync.current(), offset: i.offset, synced: i.synced }); }
     if (p === '/api/search') return json(res, 200, searchGenres(genres, q.get('q') || ''));
 
     if (p === '/api/events') return control.subscribe(res, { ip: cleanIp(req.socket.remoteAddress), agent: describeAgent(ua) });

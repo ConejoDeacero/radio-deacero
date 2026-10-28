@@ -10,7 +10,7 @@ Sin base de datos, sin login, **sin dependencias de npm**: solo Node ≥ 18 y `y
 ```bash
 pip install -U yt-dlp      # o el binario de yt-dlp en el PATH
 npm start                  # http://localhost:8000
-npm test                   # 151 pruebas, sin red
+npm test                   # 162 pruebas, sin red
 ```
 
 | Variable | Defecto | Para qué |
@@ -23,8 +23,24 @@ npm test                   # 151 pruebas, sin red
 | `YTDLP_EXTRA` | — | Opciones extra, p. ej. `--cookies /ruta/cookies.txt` |
 
 `?vis=0` en la URL apaga el visualizador (por si la Pi va justa).
-`?mode=audio` (por defecto) o `?mode=video` fija el modo de arranque. El kiosco de la Pi usa `http://localhost:8000/?mode=audio` (solo música): Chromium se
+`?mode=audio` (por defecto) o `?mode=video` fija el modo de arranque (en la vista `/kiosco` el defecto es video). El kiosco de la Pi usa `http://localhost:8000/?mode=audio` (solo música): Chromium se
 cierra a la fuerza y no siempre guarda el último modo elegido, así que el parámetro asegura cómo arranca tras cada reinicio.
+
+## Dos vistas
+
+| Dirección | Vista |
+|---|---|
+| `/` | Reproductor normal: carátula o video a un lado, controles al otro. |
+| `/kiosco` | **Vista kiosco**: el video de fondo a pantalla completa, **muy difuminado** (se ven manchas de color en movimiento, no la imagen), y la **hora en grande al frente** (12 h con AM/PM, segundos y fecha, como el kiosco original). Mismo reproductor y mismos controles; también obedece al control remoto. Con `?mode=audio` el fondo es la carátula difuminada en vez del video. |
+
+El desenfoque no usa `filter: blur` (a 1080p hace tropezar a una Raspberry Pi): el video se dibuja en un mosaico de 32×18 px y el navegador lo escala a pantalla
+completa. Medido en una Pi 4B: video a 30 fps, 0 % de cuadros perdidos y ~19 % de CPU.
+
+**La hora está corregida:** una Pi sin reloj de hardware (y con NTP bloqueado) se atrasa —la de pruebas iba **7 días** atrasada—, y un reloj enorme en pantalla lo
+delataría. El servidor calcula el desfase con la cabecera `Date` de las respuestas HTTPS de YouTube/Google (`src/timesync.js`, cada 10 min) y la vista kiosco
+muestra la hora real (`GET /api/time`). No cambia el reloj del sistema (eso pide root); si no logra sincronizar, la vista usa el reloj local.
+
+Para que la Pi arranque en la vista kiosco: `~/DEACEROPLAY-lite/deploy/install-autostart.sh "http://localhost:8000/kiosco"` y reiniciar el kiosco.
 
 ## Controles en pantalla
 
@@ -94,6 +110,7 @@ servidor (el estado del radio —género y recientes— es uno solo). Está pens
 | `GET/POST /api/podcasts`, `DELETE /api/podcasts/:id` | podcasts guardados (`{name, q}`) |
 | `GET /api/podcast/search?q=` | episodios (5 min – 4 h) |
 | `GET /api/health` | estado y **direcciones IP** del servidor |
+| `GET /api/time` | hora real corregida (`now`), desfase y si está sincronizada |
 | `GET /api/clients` | pantallas y controles conectados, y quién eres tú |
 | `GET /api/history?limit=`, `DELETE /api/history` | historial de búsquedas |
 | cabeceras `x-user` (usuario, codificado) y `x-client-time` (hora real) | las manda `play` (la web solo manda la hora); el servidor las usa para Equipos e historial |
@@ -168,6 +185,7 @@ server.js            arranque           src/radio.js    elige género/canción/b
 src/server.js        HTTP + estáticos   src/ytdlp.js    búsqueda y URLs (caché por `expire`)
 src/stream.js        proxy con Range    src/control.js  órdenes remotas (SSE) y estado
 src/clients.js       equipos conectados  src/podcasts.js podcasts guardados
+src/timesync.js      hora real (HTTPS)
 src/history.js       historial           src/jsonfile.js JSON en disco (atómico)
 src/lyrics.js        letras             src/thumb.js    carátulas
 public/              interfaz (HTML + CSS + JS, sin build): index.html (pantalla), remote.html (control)

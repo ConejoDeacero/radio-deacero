@@ -40,6 +40,7 @@ function setup(over = {}) {
     thumbs: { get: async (id) => (id === ID ? { type: 'image/jpeg', body: Buffer.from([1, 2]) } : null) },
     control: createControl({ keepAliveMs: 0 }),
     clients: createClients({ reverse: async () => null }),
+    timesync: { current: () => 1_800_000_000_000, info: () => ({ offset: 5000, synced: true, source: 'https://x.example', at: 1 }) },
     history: createHistory({ dir: fs.mkdtempSync(path.join(os.tmpdir(), 'play-hist-')) }),
     podcasts: createPodcasts({ dir: fs.mkdtempSync(path.join(os.tmpdir(), 'play-pods-')) }),
     episodes: async (q, n) => { calls.episodes.push([q, n]); if (q === 'falla') throw new Error('sin red'); return q === 'nada' ? [] : [{ id: ID, title: 'Episodio muy largo del podcast', channel: 'Mi podcast', duration: 1800 }]; },
@@ -407,4 +408,23 @@ test('/api/clients muestra el usuario declarado de cada control', () => run({}, 
   const j = await (await fetch(`${base}/api/clients`, { headers: { 'user-agent': 'otro/1', 'x-user': U('Pedro') } })).json();
   assert.equal(j.controllers.find((c) => c.agent === 'iPhone (Safari)').user, 'María');
   assert.equal(j.you.user, 'Pedro');
+}));
+
+/* ── hora corregida y vista kiosco ──────────────────────────── */
+test('GET /api/time: hora real corregida, desfase y si está sincronizada', () => run({}, async ({ base }) => {
+  const j = await (await fetch(`${base}/api/time`)).json();
+  assert.deepEqual(j, { now: 1_800_000_000_000, offset: 5000, synced: true });
+}));
+
+test('GET /api/time exige la clave a clientes remotos', () => run({ deps: { token: 's3cret', trustLoopback: false } }, async ({ base }) => {
+  assert.equal((await fetch(`${base}/api/time`)).status, 401);
+  assert.equal((await fetch(`${base}/api/time?t=s3cret`)).status, 200);
+}));
+
+test('/kiosco sirve la misma página del reproductor (la vista se elige por la ruta)', () => run({}, async ({ base }) => {
+  const r = await fetch(`${base}/kiosco`);
+  assert.equal(r.status, 200);
+  assert.match(r.headers.get('content-type'), /text\/html/);
+  assert.equal(await r.text(), '<h1>hola</h1>');
+  assert.equal(await (await fetch(`${base}/kiosco/`)).text(), '<h1>hola</h1>');
 }));

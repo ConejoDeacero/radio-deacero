@@ -50,7 +50,21 @@
     el.appendChild(img);
   }
 
-  var api = { fmtTime: fmtTime, activeLine: activeLine, createHistory: createHistory, emojiSrc: emojiSrc, setEmoji: setEmoji };
+  /* Reloj del kiosco: hora de 12 h con AM/PM y fecha en español (igual que el kiosco anterior). */
+  var DAYS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+  var MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  function two(n) { return (n < 10 ? '0' : '') + n; }
+  function clockParts(ms) {
+    var d = new Date(ms);
+    var h = d.getHours();
+    return {
+      time: two(h % 12 || 12) + ':' + two(d.getMinutes()) + ':' + two(d.getSeconds()),
+      ampm: h < 12 ? 'AM' : 'PM',
+      date: DAYS[d.getDay()] + ', ' + d.getDate() + ' de ' + MONTHS[d.getMonth()]
+    };
+  }
+
+  var api = { clockParts: clockParts, fmtTime: fmtTime, activeLine: activeLine, createHistory: createHistory, emojiSrc: emojiSrc, setEmoji: setEmoji };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Util = api;
 })(typeof window !== 'undefined' ? window : globalThis);
