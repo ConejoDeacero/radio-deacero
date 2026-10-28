@@ -1,0 +1,11 @@
+{
+  "name": "play-lite",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reproductor local de música aleatoria por género (yt-dlp)",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  }
+}

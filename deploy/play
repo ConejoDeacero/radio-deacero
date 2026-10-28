@@ -1,0 +1,390 @@
+#!/usr/bin/env python3
+"""play — controla DEACERO Play Lite desde la terminal (en la Pi, por SSH, o desde otro equipo).
+
+  play status                  qué está sonando
+  play next | prev             siguiente / anterior
+  play toggle | pause | resume pausa / play
+  play random                  cambiar a otro género al azar
+  play genre jazz              fijar un género (id exacto o texto; si hay varios los lista)
+  play genres [texto]          listar / buscar géneros
+  play search bad bunny        tocar una canción o artista UNA vez (la lista sigue como iba)
+  play podcast radio ambulante tocar el primer episodio que aparezca (una vez; la lista sigue)
+  play podcasts                listar los podcasts guardados
+  play vol 70 | +5 | -5        volumen
+  play mute                    silenciar / reactivar
+  play mode video | audio      video o solo audio
+  play lyrics                  mostrar / ocultar la letra
+  play find [CIDR]             buscar la Pi en la red si cambió de IP (p. ej. play find 192.168.1.0/24)
+  play clients                 qué equipos hay conectados: pantallas y controles
+  play history [n]             últimas búsquedas (quién buscó qué y cuándo)
+  play history clear --yes     borrar todo el historial
+
+Desde otro equipo:  play -u http://IP-DE-LA-PI:8000 -t CLAVE next
+Desde la terminal tu usuario (el de Windows/Linux) se manda solo y sale en `clients` y `history`; cámbialo con PLAY_USER.
+La web no puede saber el usuario del PC, así que ahí solo se ve el nombre del equipo y su IP.
+(o variables PLAY_URL y PLAY_TOKEN). Sin -u se usa http://localhost:8000.
+"""
+import concurrent.futures
+import getpass
+import ipaddress
+import json
+import os
+import socket
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+
+for _s in (sys.stdout, sys.stderr):
+    if hasattr(_s, "reconfigure"):
+        _s.reconfigure(encoding="utf-8", errors="replace")
+
+
+def fail(msg, code=1):
+    print(msg, file=sys.stderr)
+    sys.exit(code)
+
+
+def fmt(sec):
+    if sec is None:
+        return "–:––"
+    sec = int(sec)
+    return f"{sec // 60}:{sec % 60:02d}"
+
+
+def whoami():
+    """Usuario que se declara al servidor (para el historial y la lista de equipos)."""
+    name = os.environ.get("PLAY_USER", "")
+    if not name:
+        try:
+            name = getpass.getuser()
+        except Exception:
+            name = os.environ.get("USERNAME") or os.environ.get("USER") or ""
+    return name.strip()[:30]
+
+
+LAST_FILE = os.path.join(os.path.expanduser("~"), ".play-last")
+
+
+def remember(base):
+    """Guarda la última Pi alcanzada, para que `play find` sepa dónde buscar."""
+    if "localhost" in base or "127.0.0.1" in base:
+        return
+    try:
+        with open(LAST_FILE, "w", encoding="utf-8") as f:
+            f.write(base.rstrip("/"))
+    except OSError:
+        pass
+
+
+def last_known():
+    try:
+        with open(LAST_FILE, encoding="utf-8") as f:
+            return f.read().strip()
+    except OSError:
+        return ""
+
+
+class Api:
+    def __init__(self, base, token):
+        self.base = base.rstrip("/")
+        self.token = token
+
+    def call(self, method, path, body=None):
+        data = None if body is None else json.dumps(body).encode("utf-8")
+        req = urllib.request.Request(self.base + path, data=data, method=method)
+        req.add_header("content-type", "application/json")
+        req.add_header("x-client-time", str(int(time.time() * 1000)))
+        me = whoami()
+        if me:
+            req.add_header("x-user", urllib.parse.quote(me))
+        if self.token:
+            req.add_header("x-token", self.token)
+        try:
+            with urllib.request.urlopen(req, timeout=15) as r:
+                raw = r.read().decode("utf-8")
+                remember(self.base)
+                return r.status, (json.loads(raw) if raw else {})
+        except urllib.error.HTTPError as e:
+            raw = e.read().decode("utf-8", "replace")
+            try:
+                return e.code, json.loads(raw)
+            except ValueError:
+                return e.code, {"error": raw[:200]}
+        except (urllib.error.URLError, OSError) as e:
+            fail(f"No se pudo conectar a {self.base} ({getattr(e, 'reason', e)}).\n¿Está corriendo el servicio?  systemctl --user status play-lite")
+
+    def send(self, cmd):
+        status, j = self.call("POST", "/api/cmd", cmd)
+        if status == 200:
+            n = j.get("delivered", 1)
+            print(f"✔ enviado a {n} pantalla{'s' if n != 1 else ''}")
+        elif status == 409:
+            fail("✘ No hay ninguna pantalla abierta (¿el kiosco está corriendo?)")
+        elif status == 401:
+            fail("✘ Clave incorrecta o faltante (-t CLAVE / PLAY_TOKEN)")
+        else:
+            fail(f"✘ {j.get('error', status)}")
+
+
+def show_status(api):
+    status, s = api.call("GET", "/api/state")
+    if status == 401:
+        fail("✘ Clave incorrecta o faltante (-t CLAVE / PLAY_TOKEN)")
+    t = s.get("track")
+    if not t:
+        print(f"Sin reproducción · pantallas conectadas: {s.get('players', 0)}")
+        return
+    g = s.get("genre") or {}
+    icon = "⏸ En pausa" if s.get("paused") else "▶ Sonando"
+    print(f"{icon}: {t.get('title', '')}")
+    print(f"   {t.get('channel', '')}")
+    print(f"   Género: {g.get('emoji', '')} {g.get('label', '—')} · volumen {s.get('volume', '?')}%"
+          f"{' (silenciado)' if s.get('muted') else ''} · {s.get('mode', 'audio')}"
+          f" · {fmt(s.get('time'))} / {fmt(t.get('duration'))}")
+    print(f"   Pantallas conectadas: {s.get('players', 0)}")
+    show_server(api)
+
+
+def ago(sec):
+    if sec < 60:
+        return f"{sec} s"
+    if sec < 3600:
+        return f"{sec // 60} min"
+    return f"{sec // 3600} h"
+
+
+CMD_ES = {"next": "Siguiente", "prev": "Anterior", "toggle": "Pausa/play", "play": "Play", "pause": "Pausa", "random": "Otro género",
+          "genre": "Fijar género", "search": "Buscar canción", "track": "Tocar episodio/canción", "volume": "Volumen",
+          "mute": "Silenciar", "mode": "Audio/video", "lyrics": "Letra"}
+
+
+def show_clients(api):
+    status, j = api.call("GET", "/api/clients")
+    if status == 401:
+        fail("✘ Clave incorrecta o faltante (-t CLAVE / PLAY_TOKEN)")
+    you = j.get("you", {})
+
+    def name(x):
+        host = x.get("host")
+        where = f"{host} ({x['ip']})" if host and host != "esta Pi" else (host or x["ip"])
+        return f"{x['user']} — {where}" if x.get("user") else where
+
+    print(f"Pantallas ({len(j['screens'])}):")
+    for s in j["screens"]:
+        print(f"  ● {name(s)}   {s['agent']}   conectada hace {ago(s['seconds'])}")
+    if not j["screens"]:
+        print("  (ninguna)")
+    active = sum(1 for c in j["controllers"] if c["online"])
+    print(f"Controles ({active} activos, últimos 10 min):")
+    for c in j["controllers"]:
+        mark = "●" if c["online"] else "○"
+        state = "activo" if c["online"] else f"visto hace {ago(c['seenAgo'])}"
+        last = f" · última orden: {CMD_ES.get(c['lastCmd'], c['lastCmd'])} hace {ago(c['lastCmdAgo'])}" if c.get("lastCmd") else ""
+        me = "   ← tú" if c["ip"] == you.get("ip") and c["agent"] == you.get("agent") else ""
+        print(f"  {mark} {name(c)}   {c['agent']}   {state}{last}{me}")
+    if not j["controllers"]:
+        print("  (nadie)")
+
+
+KIND_ES = {"song": "canción", "podcast": "podcast", "episode": "episodio", "genre": "género"}
+
+
+def show_history(api, n):
+    status, items = api.call("GET", f"/api/history?limit={n}")
+    if status == 401:
+        fail("✘ Clave incorrecta o faltante (-t CLAVE / PLAY_TOKEN)")
+    if not items:
+        print("Aún no hay búsquedas.")
+        return
+    now = int(time.time() * 1000)
+    for e in items:
+        when = time.strftime("%d/%m %H:%M", time.localtime(e["at"] / 1000))
+        who = e.get("user") or (e.get("host") if e.get("host") not in (None, "esta Pi") else e.get("ip")) or "alguien"
+        host = f" ({e['host']})" if e.get("user") and e.get("host") and e["host"] != "esta Pi" else ""
+        print(f"  {when}  (hace {ago(max(0, (now - e['at']) // 1000))})  {KIND_ES.get(e['kind'], e['kind']):<8}  {e['text']}   — {who}{host}")
+
+
+def show_server(api):
+    status, h = api.call("GET", "/api/health")
+    if status == 200 and h.get("ips"):
+        port = urllib.parse.urlparse(api.base).port or 80
+        print("   Control web: " + "  ·  ".join(f"http://{ip}:{port}/remote" for ip in h["ips"]))
+
+
+def local_ip():
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("10.255.255.255", 1))
+            return s.getsockname()[0]
+    except OSError:
+        return ""
+
+
+def probe(ip, port, timeout=0.8):
+    try:
+        with urllib.request.urlopen(f"http://{ip}:{port}/api/health", timeout=timeout) as r:
+            j = json.loads(r.read().decode("utf-8"))
+            if j.get("ok") and "ytdlp" in j:
+                return ip, j
+    except (OSError, ValueError):
+        pass
+    return None
+
+
+def find_servers(cidr, port=8000):
+    nets = []
+    if cidr:
+        nets.append(ipaddress.ip_network(cidr, strict=False))
+    else:
+        last = last_known()
+        host = urllib.parse.urlparse(last).hostname if last else ""
+        if host:
+            nets.append(ipaddress.ip_network(host + "/23", strict=False))
+        mine = local_ip()
+        if mine:
+            nets.append(ipaddress.ip_network(mine + "/24", strict=False))
+    if not nets:
+        fail("No sé dónde buscar. Indica la red:  play find 192.168.1.0/24")
+    hosts = []
+    for n in nets:
+        if n.num_addresses > 1024:
+            fail(f"La red {n} es muy grande (máx. 1024 direcciones). Usa una más chica, p. ej. /23.")
+        hosts += [str(h) for h in n.hosts() if str(h) not in hosts]
+    print(f"Buscando en {', '.join(str(n) for n in nets)} ({len(hosts)} direcciones, puerto {port})…")
+    found = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=128) as ex:
+        for r in ex.map(lambda h: probe(h, port), hosts):
+            if r:
+                found.append(r)
+    if not found:
+        print("✘ No encontré ninguna Pi. ¿Está encendida y en esa red? Prueba otra red:  play find 192.168.2.0/24")
+        sys.exit(1)
+    for ip, j in found:
+        print(f"✔ http://{ip}:{port}   (yt-dlp {j.get('ytdlp')}, encendida hace {j.get('uptime', 0) // 60} min)")
+        print(f"   Control web: http://{ip}:{port}/remote")
+        print(f"   SSH:         ssh admin@{ip}")
+    remember(f"http://{found[0][0]}:{port}")
+
+
+def pick_genre(api, text):
+    status, genres = api.call("GET", "/api/genres")
+    if any(g["id"] == text for g in genres):
+        return text
+    status, found = api.call("GET", "/api/search?q=" + urllib.parse.quote(text))
+    if not found:
+        fail(f'✘ Ningún género coincide con "{text}". Prueba:  play genres {text[:3]}')
+    exact = [g for g in found if g["label"].lower() == text.lower()]
+    if len(exact) == 1:
+        return exact[0]["id"]
+    if len(found) == 1:
+        return found[0]["id"]
+    print(f'Varios géneros coinciden con "{text}"; usa el id exacto:')
+    for g in found:
+        print(f"  {g['id']:<24} {g.get('emoji', '')} {g['label']}")
+    sys.exit(2)
+
+
+SIMPLE = {"toggle": "toggle", "pause": "pause", "resume": "play", "play": "play", "next": "next", "prev": "prev",
+          "previous": "prev", "random": "random", "mute": "mute", "lyrics": "lyrics"}
+
+
+def main(argv):
+    base = os.environ.get("PLAY_URL", "http://localhost:8000")
+    token = os.environ.get("PLAY_TOKEN", "")
+    args = list(argv)
+    while args and args[0] in ("-u", "--url", "-t", "--token"):
+        if len(args) < 2:
+            fail("Falta el valor de " + args[0])
+        if args[0] in ("-u", "--url"):
+            base = args[1]
+        else:
+            token = args[1]
+        args = args[2:]
+    if not args or args[0] in ("help", "-h", "--help"):
+        print(__doc__)
+        return
+    api = Api(base, token)
+    cmd, rest = args[0].lower(), args[1:]
+
+    if cmd == "status":
+        show_status(api)
+    elif cmd in SIMPLE:
+        api.send({"cmd": SIMPLE[cmd]})
+    elif cmd in ("vol", "volume"):
+        if not rest:
+            fail("Uso: play vol 70 | +5 | -5")
+        v = rest[0]
+        try:
+            if v[0] in "+-":
+                api.send({"cmd": "volume", "delta": int(v)})
+            else:
+                api.send({"cmd": "volume", "set": int(v)})
+        except ValueError:
+            fail("Uso: play vol 70 | +5 | -5")
+    elif cmd == "mode":
+        if not rest or rest[0] not in ("audio", "video"):
+            fail("Uso: play mode video | audio")
+        api.send({"cmd": "mode", "mode": rest[0]})
+    elif cmd == "genre":
+        if not rest:
+            fail("Uso: play genre jazz   (lista: play genres)")
+        api.send({"cmd": "genre", "id": pick_genre(api, " ".join(rest))})
+    elif cmd == "genres":
+        if rest:
+            status, found = api.call("GET", "/api/search?q=" + urllib.parse.quote(" ".join(rest)))
+        else:
+            status, found = api.call("GET", "/api/genres")
+            found = sorted(found, key=lambda g: g["label"].lower())
+        for g in found:
+            print(f"{g['id']:<24} {g.get('emoji', '')} {g['label']}")
+        print(f"({len(found)} géneros)")
+    elif cmd == "history":
+        if rest and rest[0] == "clear":
+            if "--yes" not in rest[1:]:
+                fail("Esto borra el historial de TODOS los equipos. Para confirmar:  play history clear --yes")
+            status, _ = api.call("DELETE", "/api/history")
+            if status == 204 or status == 200:
+                print("✔ historial borrado")
+            elif status == 401:
+                fail("✘ Clave incorrecta o faltante (-t CLAVE / PLAY_TOKEN)")
+            else:
+                fail(f"✘ no se pudo borrar ({status})")
+        else:
+            try:
+                n = int(rest[0]) if rest else 20
+            except ValueError:
+                fail("Uso: play history [cuántas]  |  play history clear --yes")
+            show_history(api, max(1, min(n, 200)))
+    elif cmd == "clients":
+        show_clients(api)
+    elif cmd == "find":
+        find_servers(rest[0] if rest else "")
+    elif cmd == "podcasts":
+        status, items = api.call("GET", "/api/podcasts")
+        if not items:
+            print("Aún no hay podcasts guardados (se guardan desde la web /remote, pestaña Podcasts).")
+        for it in items:
+            print(f"{it['id']}  {it['name']}   (búsqueda: {it['q']})")
+    elif cmd == "podcast":
+        if not rest:
+            fail('Uso: play podcast "radio ambulante"')
+        status, eps = api.call("GET", "/api/podcast/search?q=" + urllib.parse.quote(" ".join(rest)))
+        if status == 503:
+            fail("✘ Sin conexión con YouTube")
+        if status != 200 or not eps:
+            fail("✘ No encontré episodios de ese podcast")
+        ep = eps[0]
+        print(f"Tocando: {ep['title']}  ({fmt(ep.get('duration'))})")
+        api.send({"cmd": "track", "kind": "podcast", "track": {"id": ep["id"], "title": ep["title"], "channel": ep.get("channel", ""), "duration": ep.get("duration", 0)}})
+    elif cmd == "search":
+        if not rest:
+            fail('Uso: play search "bad bunny"')
+        api.send({"cmd": "search", "q": " ".join(rest)})
+    else:
+        fail(f'Orden desconocida: "{cmd}". Usa  play help', 2)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

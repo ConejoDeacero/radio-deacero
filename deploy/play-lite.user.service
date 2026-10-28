@@ -1,0 +1,22 @@
+# Servicio de USUARIO (no necesita sudo):  ~/.config/systemd/user/play-lite.service
+#   systemctl --user daemon-reload && systemctl --user enable --now play-lite
+# Arranca con la sesión de escritorio del usuario (autologin). Si quieres que arranque aunque nadie
+# inicie sesión: sudo loginctl enable-linger <usuario>
+[Unit]
+Description=DEACERO Play Lite
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/DEACEROPLAY-lite
+Environment=PORT=8000
+# node y yt-dlp instalados en ~/.local/bin (sin sudo)
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+# HOST=0.0.0.0 y REMOTE_TOKEN=... (acceso desde la red) se leen de este archivo; opcional: YTDLP_EXTRA=--cookies ...
+EnvironmentFile=-%h/.config/play-lite.env
+ExecStart=%h/.local/bin/node server.js
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target

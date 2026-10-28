@@ -1,0 +1,8 @@
+# /etc/systemd/system/yt-dlp-update.service  (lo dispara yt-dlp-update.timer)
+# YouTube cambia seguido; con yt-dlp viejo las pistas dejan de sonar.
+[Unit]
+Description=Actualizar yt-dlp
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/yt-dlp -U

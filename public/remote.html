@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>DEACERO Play · Control</title>
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/remote.css">
+</head>
+<body class="remote">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></symbol>
+  <symbol id="i-prev" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></symbol>
+  <symbol id="i-next" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></symbol>
+  <symbol id="i-shuffle" viewBox="0 0 24 24"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></symbol>
+  <symbol id="i-video" viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></symbol>
+  <symbol id="i-music" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></symbol>
+  <symbol id="i-vol" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></symbol>
+  <symbol id="i-mute" viewBox="0 0 24 24"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></symbol>
+</svg>
+
+<div class="glow" id="glow" aria-hidden="true"></div>
+
+<main class="rem">
+  <header class="rem-top">
+    <div class="brand"><img src="assets/favicon.svg" alt="" width="28" height="28"><div class="brand-name">DEACERO <em>PLAY</em></div></div>
+    <div class="conn" id="conn" role="status">Conectando…</div>
+  </header>
+
+  <!-- Lo que suena: la carátula arriba a todo el ancho y el título completo debajo (sin cortarse) -->
+  <section class="now">
+    <img id="thumb" alt="" class="now-art">
+    <div class="now-info">
+      <div class="now-genre" id="genre">—</div>
+      <h1 class="now-title" id="title">Sin reproducción</h1>
+      <p class="now-ch" id="channel">&nbsp;</p>
+      <p class="now-time" id="time"></p>
+    </div>
+  </section>
+
+  <section class="rem-transport">
+    <button type="button" class="btn" id="prev" aria-label="Anterior"><svg><use href="#i-prev"/></svg></button>
+    <button type="button" class="btn btn-play" id="toggle" aria-label="Pausa o play"><svg id="toggleIco"><use href="#i-pause"/></svg></button>
+    <button type="button" class="btn" id="next" aria-label="Siguiente"><svg><use href="#i-next"/></svg></button>
+  </section>
+
+  <section class="volume-row">
+    <button type="button" class="btn btn-sm" id="mute" aria-label="Silenciar"><svg id="muteIco"><use href="#i-vol"/></svg></button>
+    <input type="range" class="range" id="vol" min="0" max="100" value="80" aria-label="Volumen">
+  </section>
+
+  <section class="actions">
+    <button type="button" class="btn btn-act" id="random"><svg><use href="#i-shuffle"/></svg><span>Al azar</span></button>
+    <button type="button" class="btn btn-act" id="mode"><svg id="modeIco"><use href="#i-video"/></svg><span id="modeLbl">Video</span></button>
+    <button type="button" class="btn btn-act" id="lyrics"><svg><use href="#i-mic"/></svg><span>Letra</span></button>
+  </section>
+
+  <nav class="tabs" role="tablist" aria-label="Qué quieres buscar">
+    <button type="button" class="tab on" role="tab" aria-selected="true" data-tab="music" id="tabMusic">Música</button>
+    <button type="button" class="tab" role="tab" aria-selected="false" data-tab="podcasts" id="tabPods">Podcasts</button>
+    <button type="button" class="tab" role="tab" aria-selected="false" data-tab="devices" id="tabDevs">Equipos</button>
+  </nav>
+
+  <!-- Música: una canción o artista suena UNA vez y la lista sigue como iba -->
+  <section class="panel-tab search" id="panelMusic" role="tabpanel">
+    <h2 class="sub">Canción o artista</h2>
+    <input type="search" id="q" class="filter" placeholder="Escribe una canción o artista…" autocomplete="off" aria-label="Buscar canción o artista">
+    <button type="button" class="btn btn-act btn-wide" id="goSong"><svg><use href="#i-music"/></svg><span>Tocar una vez</span></button>
+    <p class="hint">«Tocar una vez» no cambia la lista: al terminar sigue el género de antes.</p>
+
+    <h2 class="sub">Elegir género <span class="count" id="genreCount"></span></h2>
+    <input type="search" id="genreQ" class="filter" placeholder="Filtrar géneros (jazz, salsa, rock…)" autocomplete="off" aria-label="Filtrar géneros">
+    <div class="chips genre-list" id="genreList" aria-label="Géneros"></div>
+  </section>
+
+  <!-- Podcasts: guardados + búsqueda de episodios -->
+  <section class="panel-tab" id="panelPods" role="tabpanel" hidden>
+    <h2 class="sub">Mis podcasts</h2>
+    <div class="saved" id="podSaved"><p class="hint">Aún no hay podcasts guardados.</p></div>
+
+    <h2 class="sub">Buscar podcast</h2>
+    <input type="search" id="podQ" class="filter" placeholder="Nombre del podcast o tema…" autocomplete="off" aria-label="Buscar podcast">
+    <div class="search-btns">
+      <button type="button" class="btn btn-act" id="podGo"><svg><use href="#i-mic"/></svg><span>Ver episodios</span></button>
+      <button type="button" class="btn btn-act" id="podSave"><svg><use href="#i-star"/></svg><span>Guardar podcast</span></button>
+    </div>
+    <div class="eps" id="podResults" aria-live="polite"></div>
+  </section>
+  <!-- Equipos: quién está reproduciendo y quién está controlando -->
+  <section class="panel-tab" id="panelDevs" role="tabpanel" hidden>
+    <h2 class="sub" id="devScreensH">Pantallas</h2>
+    <div class="devs" id="devScreens" aria-live="polite"></div>
+    <h2 class="sub" id="devControlsH">Controles</h2>
+    <div class="devs" id="devControls" aria-live="polite"></div>
+    <p class="hint">Se actualiza solo. «Activo» = se vio hace menos de 10 s. Los controles se olvidan tras 10 min sin actividad.</p>
+  </section>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="js/util.js"></script>
+<script src="js/remote.js"></script>
+</body>
+</html>

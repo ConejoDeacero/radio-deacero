@@ -1,0 +1,68 @@
+/* Control remoto: una columna, pensada para celular. Reutiliza los tokens y botones de app.css. */
+body.remote { display: block; height: auto; min-height: 100dvh; overflow-y: auto; font-size: 16px; user-select: text; }
+html { font-size: 16px; }
+.rem { position: relative; z-index: 1; max-width: 40rem; margin: 0 auto; padding: 1rem 1rem 3rem; display: flex; flex-direction: column; gap: 1.1rem; }
+.rem-top { display: flex; align-items: center; justify-content: space-between; gap: .8rem; }
+.rem .brand-name { display: block; }
+.conn { font-size: .85rem; color: var(--txt2); padding: .3rem .8rem; border-radius: var(--r-full); background: var(--mat); border: 1px solid var(--hair); white-space: nowrap; }
+.conn.ok { color: #7ee2a8; border-color: rgba(126, 226, 168, .35); }
+.conn.bad { color: #ff9b9b; border-color: rgba(255, 155, 155, .35); }
+
+/* Lo que suena: carátula a todo el ancho, título completo debajo (se parte en las líneas que haga falta) */
+.now { display: flex; flex-direction: column; gap: .8rem; }
+.now-art { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: var(--r-lg); background: var(--card); box-shadow: 0 0 0 .5px var(--hair); }
+.now-genre { font-size: .9rem; color: var(--pl-300); font-weight: 600; display: flex; align-items: center; gap: .35rem; }
+.now-title { font-size: 1.35rem; font-weight: 800; letter-spacing: -.01em; line-height: 1.25; overflow-wrap: anywhere; word-break: normal; }
+.now-ch { color: var(--txt2); font-size: .95rem; overflow-wrap: anywhere; }
+.now-time { color: var(--muted); font-size: .85rem; font-variant-numeric: tabular-nums; }
+.now-genre .emo { width: 1.2em; height: 1.2em; vertical-align: -.2em; }
+@media (min-width: 600px) { .now { flex-direction: row; align-items: flex-start; } .now-art { width: 15rem; flex: none; } .now-info { min-width: 0; } }
+
+.rem .btn { width: 4rem; height: 4rem; }
+.rem .btn-sm { width: 3rem; height: 3rem; }
+.rem .btn-play { width: 5.5rem; height: 5.5rem; }
+.rem .btn-act { width: auto; height: auto; min-height: 4rem; font-size: .85rem; }
+.rem-transport { display: flex; justify-content: center; align-items: center; gap: 1.6rem; }
+.rem .actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.rem .range { height: 2.6rem; }
+
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: .4rem; padding: .25rem; border-radius: var(--r-full); background: var(--mat); border: 1px solid var(--hair); }
+.tab { min-height: 2.8rem; border-radius: var(--r-full); font-weight: 700; color: var(--txt2); }
+.tab.on { background: var(--pl-500); color: #000; }
+
+.panel-tab { display: flex; flex-direction: column; gap: .8rem; }
+.search .filter, .panel-tab .filter { flex: none; width: 100%; }
+.search-btns { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+.hint { color: var(--muted); font-size: .85rem; }
+.sub { font-size: 1rem; font-weight: 700; color: var(--txt2); margin-top: .3rem; }
+.rem .chips { grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); overflow: visible; padding: 0; }
+.rem .chips.genre-list { max-height: 60vh; overflow-y: auto; overscroll-behavior: contain; padding: .1rem; }
+.btn-wide { width: 100%; }
+.count { color: var(--muted); font-weight: 400; font-size: .85rem; }
+
+/* Podcasts guardados y episodios: el título se lee completo */
+.saved { display: flex; flex-direction: column; gap: .5rem; }
+.pod { display: flex; align-items: stretch; gap: .4rem; }
+.pod .chip { flex: 1; min-width: 0; }
+.pod .chip .l { white-space: normal; overflow-wrap: anywhere; }
+.pod .del { width: 3rem; flex: none; border-radius: var(--r-lg); background: var(--mat); border: 1px solid var(--hair); color: var(--txt2); }
+.eps { display: flex; flex-direction: column; gap: .6rem; }
+.ep { display: flex; align-items: center; gap: .8rem; padding: .8rem; border-radius: var(--r-lg); background: var(--mat); border: 1px solid var(--hair); }
+.ep-info { flex: 1; min-width: 0; }
+.ep-title { font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+.ep-meta { color: var(--muted); font-size: .85rem; margin-top: .2rem; overflow-wrap: anywhere; }
+.ep .btn { width: 3.4rem; height: 3.4rem; flex: none; background: var(--pl-500); color: #000; border-color: transparent; }
+.ep .btn svg { width: 1.6rem; height: 1.6rem; }
+
+/* Equipos conectados */
+.devs { display: flex; flex-direction: column; gap: .5rem; }
+.dev { display: flex; gap: .7rem; align-items: flex-start; padding: .8rem; border-radius: var(--r-lg); background: var(--mat); border: 1px solid var(--hair); }
+.dev .dot { width: .7rem; height: .7rem; border-radius: 50%; margin-top: .45rem; flex: none; background: var(--muted); }
+.dev.on .dot { background: #4ade80; box-shadow: 0 0 0 .25rem rgba(74, 222, 128, .2); }
+.dev-main { min-width: 0; flex: 1; }
+.dev-name { font-weight: 700; overflow-wrap: anywhere; }
+.dev-ip { color: var(--muted); font-weight: 400; font-size: .85rem; }
+.dev-meta { color: var(--txt2); font-size: .85rem; margin-top: .15rem; overflow-wrap: anywhere; }
+.dev-you { color: var(--pl-300); font-weight: 700; font-size: .8rem; margin-left: .3rem; }
+.rem .toast { bottom: 1rem; }
+@media (min-width: 700px) { .rem { padding-top: 2rem; } }

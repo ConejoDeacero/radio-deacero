@@ -1,0 +1,238 @@
+/* DEACERO Play Lite — mismos tokens que fresh.css (negro + naranja DeAcero),
+   pero SIN backdrop-filter ni blur: pensado para una Raspberry Pi con pantalla táctil.
+   Todo va en `em`: la escala completa sigue al tamaño del monitor (ver html). */
+
+@font-face {
+  font-family: 'Inter'; font-style: normal; font-weight: 100 900; font-display: swap;
+  src: url(../assets/inter-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Inter'; font-style: normal; font-weight: 100 900; font-display: swap;
+  src: url(../assets/inter-latin-ext.woff2) format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+:root {
+  --bg: #000;  --bg2: #121212;  --bg3: #181818;  --card: #242424;
+  --txt: #fff; --txt2: #b3b3b3; --muted: #727272;
+  --pl-300: #F7B84B; --pl-500: #F59B23; --pl-600: #E0871A;
+  --pl-glow: rgba(245,155,35,.45);
+  --pl-tint-2: rgba(245,155,35,.10); --pl-tint-3: rgba(245,155,35,.18); --pl-border: rgba(245,155,35,.30);
+  --mat: rgba(255,255,255,.07); --mat-hi: rgba(255,255,255,.12);
+  --hair: rgba(255,255,255,.10); --hair-hi: rgba(255,255,255,.24);
+  --r-md: 14px; --r-lg: 20px; --r-xl: 28px; --r-full: 9999px;
+  --ease: cubic-bezier(.19, 1, .22, 1);
+  --accent: #F59B23;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+/* 1080p ≈ 21 px · pantalla táctil de 7" (800×480) ≈ 15 px */
+html { font-size: clamp(14px, 1vmin + 10px, 26px); }
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg); color: var(--txt); line-height: 1.4;
+  height: 100vh; height: 100dvh; overflow: hidden;
+  display: grid; grid-template-rows: auto 1fr;
+  -webkit-tap-highlight-color: transparent; user-select: none;
+}
+body.idle { cursor: none; }
+[hidden] { display: none !important; }
+svg { fill: currentColor; width: 1em; height: 1em; flex: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; touch-action: manipulation; }
+:focus-visible { outline: 3px solid var(--pl-500); outline-offset: 3px; }
+
+/* Halo de fondo: dos gradientes baratos; el segundo toma el color del género */
+.glow {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 1; transition: opacity .5s var(--ease);
+  background:
+    radial-gradient(60% 55% at 85% 0%, var(--pl-tint-3), transparent 70%),
+    radial-gradient(55% 50% at 10% 100%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%);
+}
+.top, .stage { position: relative; z-index: 1; }
+
+/* ── Barra superior ── */
+.top { display: flex; align-items: center; justify-content: space-between; gap: 1em; padding: .9em 1.4em 0; }
+.brand { cursor: pointer; display: flex; align-items: center; gap: .6em; min-width: 0; }
+.brand img { width: 1.8em; height: 1.8em; }
+.brand-name { font-weight: 800; letter-spacing: -.02em; font-size: 1.15em; white-space: nowrap; }
+.brand-name em { font-style: normal; color: var(--pl-500); }
+
+.genre-pill {
+  display: inline-flex; align-items: center; gap: .55em; min-height: 2.8em; max-width: 60%;
+  padding: .35em 1.1em; border-radius: var(--r-full);
+  background: var(--mat); border: 1px solid var(--accent);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.12);
+  transition: background .2s, transform .2s var(--ease);
+}
+.genre-pill:active { transform: scale(.97); background: var(--mat-hi); }
+.genre-pill.pop { animation: pop .6s var(--ease); }
+.emo { width: 1.3em; height: 1.3em; vertical-align: -.25em; }
+.gp-emoji { display: inline-flex; line-height: 1; }
+.gp-emoji .emo { width: 1.45em; height: 1.45em; vertical-align: 0; }
+.gp-label { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gp-lock { width: .9em; height: .9em; color: var(--accent); }
+@keyframes pop { 0% { transform: scale(.9); } 60% { transform: scale(1.06); } 100% { transform: scale(1); } }
+
+/* ── Escenario ── */
+.stage {
+  min-height: 0; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  align-items: center; gap: 2.2em; padding: 1.2em 1.8em 1.6em;
+}
+
+.art {
+  position: relative; aspect-ratio: 16 / 9; width: 100%; max-height: 100%; justify-self: center;
+  border-radius: var(--r-xl); overflow: hidden; background: var(--card);
+  box-shadow: 0 1px 3px rgba(0,0,0,.18), 0 16px 32px rgba(0,0,0,.38), 0 0 0 .5px var(--hair);
+}
+.art img, .art video { position: absolute; inset: 0; width: 100%; height: 100%; }
+.art img { object-fit: cover; opacity: 0; transition: opacity .4s var(--ease); }
+.art img.on { opacity: 1; }
+.art video { object-fit: contain; background: #000; visibility: hidden; }
+body[data-mode="video"] .art video { visibility: visible; }
+body[data-mode="video"] .art img { opacity: 0; }
+.art-empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); }
+.art-empty svg { width: 28%; height: 28%; opacity: .5; }
+.art img.on ~ .art-empty { display: none; }
+#vis {
+  position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 28%; pointer-events: none;
+  -webkit-mask-image: linear-gradient(to top, #000 30%, transparent); mask-image: linear-gradient(to top, #000 30%, transparent);
+}
+body[data-mode="video"] #vis { opacity: .55; }
+
+/* ── Panel ── */
+.panel { display: flex; flex-direction: column; gap: clamp(.5em, 2.2vh, 1.1em); min-width: 0; }
+.title {
+  font-size: clamp(1.3em, min(2.6vw, 4.4vh) + .6em, 2.6em); font-weight: 800; letter-spacing: -.025em; line-height: 1.12;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.channel { color: var(--txt2); font-size: 1.1em; margin-top: .25em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.progress-row, .volume-row { display: flex; align-items: center; gap: .8em; }
+.time { font-variant-numeric: tabular-nums; color: var(--txt2); font-size: .95em; min-width: 3.2em; }
+.time:last-child { text-align: right; }
+
+/* Barras (progreso y volumen): táctiles, con pulgar grande */
+.range {
+  --p: 0%; flex: 1; min-width: 0; height: 2.6em; background: transparent; -webkit-appearance: none; appearance: none; cursor: pointer;
+}
+.range::-webkit-slider-runnable-track {
+  height: .55em; border-radius: var(--r-full);
+  background: linear-gradient(to right, var(--pl-500) var(--p), rgba(255,255,255,.18) var(--p));
+}
+.range::-moz-range-track { height: .55em; border-radius: var(--r-full); background: rgba(255,255,255,.18); }
+.range::-moz-range-progress { height: .55em; border-radius: var(--r-full); background: var(--pl-500); }
+.range::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 1.7em; height: 1.7em; margin-top: -.575em; border-radius: 50%;
+  background: #fff; border: 0; box-shadow: 0 0 0 .35em var(--pl-tint-3), 0 2px 8px rgba(0,0,0,.5);
+}
+.range::-moz-range-thumb { width: 1.7em; height: 1.7em; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 0 0 .35em var(--pl-tint-3); }
+
+/* ── Botones (tamaño táctil ≥ 3.2em ≈ 48–67 px según monitor) ── */
+.btn {
+  display: inline-grid; place-items: center; width: 4em; height: 4em; border-radius: 50%;
+  background: var(--mat); border: 1px solid var(--hair);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.12);
+  transition: transform .2s var(--ease), background .2s;
+}
+.btn svg { width: 1.9em; height: 1.9em; }
+.btn:hover { background: var(--mat-hi); }
+.btn:active { transform: scale(.92); background: var(--pl-tint-3); }
+.btn-sm { width: 3.2em; height: 3.2em; }
+.btn-sm svg { width: 1.5em; height: 1.5em; }
+.btn-play {
+  width: 6em; height: 6em; background: var(--pl-500); color: #000; border-color: transparent;
+  box-shadow: 0 0 0 .35em var(--pl-tint-3), 0 8px 28px var(--pl-glow);
+}
+.btn-play:hover { background: var(--pl-300); }
+.btn-play:active { background: var(--pl-600); }
+.btn-play svg { width: 2.8em; height: 2.8em; }
+.btn[aria-pressed="true"] { background: var(--pl-tint-3); border-color: var(--pl-border); color: var(--pl-300); }
+
+.transport { display: flex; align-items: center; justify-content: center; gap: 1.6em; padding: .2em 0; }
+
+.actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .6em; }
+.btn-act {
+  width: auto; height: auto; min-height: 4.2em; grid-auto-flow: row; align-content: center; justify-items: center; gap: .3em;
+  padding: .55em .4em; border-radius: var(--r-lg); font-weight: 600; font-size: .85em; text-align: center;
+}
+.btn-act svg { width: 1.7em; height: 1.7em; }
+.btn-act span { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sheet-head .btn-act { grid-auto-flow: column; min-height: 3.2em; padding: .5em 1.1em; font-size: .95em; }
+.sheet-head .btn-act svg { width: 1.3em; height: 1.3em; }
+
+.busy .title { opacity: .55; }
+.title.long { font-size: clamp(1.15em, min(1.9vw, 3.4vh) + .5em, 1.9em); -webkit-line-clamp: 4; }
+.info { position: fixed; left: 1.4em; bottom: 1em; z-index: 5; max-width: 90vw; padding: .5em 1.1em; border-radius: var(--r-full); background: var(--mat); border: 1px solid var(--hair); color: var(--txt2); font-size: .85em; pointer-events: none; }
+.upnext { color: var(--muted); font-size: .9em; min-height: 1.4em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.upnext b { color: var(--txt2); font-weight: 600; }
+
+/* ── Selector de géneros ── */
+.sheet { position: fixed; inset: 0; z-index: 20; background: #050505; display: flex; flex-direction: column; padding: 1.2em 1.6em; gap: 1em; }
+.sheet-head { display: flex; align-items: center; gap: .9em; flex-wrap: wrap; }
+.sheet-head h2 { font-size: 1.5em; font-weight: 800; letter-spacing: -.02em; flex: 1 1 auto; }
+.filter {
+  flex: 1 1 14em; min-height: 3.2em; padding: 0 1.2em; border-radius: var(--r-full);
+  background: var(--mat); border: 1px solid var(--hair); color: var(--txt); font: inherit; user-select: text;
+}
+.filter::placeholder { color: var(--muted); }
+.chips {
+  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-bottom: 1em;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(12em, 1fr)); gap: .7em; align-content: start;
+}
+.chip {
+  display: flex; align-items: center; gap: .6em; min-height: 3.6em; padding: .5em 1em; text-align: left;
+  border-radius: var(--r-lg); background: var(--mat); border: 1px solid var(--hair);
+  border-left: .35em solid var(--c, var(--pl-500));
+}
+.chip:active { background: var(--pl-tint-3); }
+.chip.on { background: var(--pl-tint-3); border-color: var(--pl-border); border-left-color: var(--c, var(--pl-500)); }
+.chip .e { display: inline-flex; line-height: 1; }
+.chip .e .emo { width: 1.7em; height: 1.7em; vertical-align: 0; }
+.chip .l { font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── Letra / karaoke ── */
+.lyrics {
+  position: fixed; inset: 0; z-index: 30; background: #000; display: flex; flex-direction: column; padding: 1.4em 2em;
+  background-image: radial-gradient(70% 60% at 50% 110%, color-mix(in srgb, var(--accent) 25%, transparent), transparent 70%);
+}
+.lyr-close { position: absolute; top: 1em; right: 1.2em; z-index: 1; }
+.lyr-head { text-align: center; color: var(--txt2); padding: .4em 4em; min-height: 3em; }
+.lyr-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lyr-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; text-align: center; padding: 30vh 0; scrollbar-width: none; }
+.lyr-body::-webkit-scrollbar { display: none; }
+.lyr-line { font-size: 1.5em; font-weight: 700; line-height: 1.35; padding: .3em 1em; color: rgba(255,255,255,.28); transition: color .3s, transform .3s var(--ease); transform-origin: center; }
+.lyr-line.on { color: #fff; transform: scale(1.12); }
+.lyr-line.past { color: rgba(255,255,255,.45); }
+.lyr-plain { white-space: pre-wrap; font-size: 1.3em; line-height: 1.7; color: var(--txt2); padding: 0 1em; user-select: text; }
+.lyr-msg { color: var(--muted); font-size: 1.2em; padding-top: 12vh; }
+
+/* ── Arranque manual (si el navegador bloquea el autoplay) ── */
+.start {
+  position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,.88); color: #fff;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1em; font-size: 1.5em; font-weight: 700;
+}
+.start svg { width: 4em; height: 4em; padding: 1em; border-radius: 50%; background: var(--pl-500); color: #000; box-shadow: 0 0 0 .3em var(--pl-tint-3), 0 8px 28px var(--pl-glow); }
+
+.toast {
+  position: fixed; left: 50%; bottom: 1.4em; z-index: 50; transform: translate(-50%, 200%); opacity: 0; max-width: 90vw;
+  padding: .8em 1.4em; border-radius: var(--r-full); background: var(--card); border: 1px solid var(--hair-hi);
+  box-shadow: 0 8px 24px rgba(0,0,0,.6); transition: transform .35s var(--ease), opacity .35s; pointer-events: none;
+}
+.toast.show { transform: translate(-50%, 0); opacity: 1; }
+
+/* ── Pantalla vertical o estrecha: una sola columna ── */
+@media (max-aspect-ratio: 1/1), (max-width: 760px) {
+  .stage { grid-template-columns: 1fr; align-content: start; gap: 1.2em; overflow-y: auto; padding-bottom: 1.4em; }
+  .art { max-height: 38vh; }
+  .brand-name { display: none; }
+}
+/* Pantallas bajas (7" táctil en horizontal): sin la línea "Sigue:" y botones algo más compactos */
+@media (max-height: 560px) {
+  .upnext { display: none; }
+  .btn-play { width: 5.2em; height: 5.2em; }
+  .stage { padding-top: .6em; padding-bottom: .8em; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

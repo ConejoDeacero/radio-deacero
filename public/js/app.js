@@ -1,0 +1,621 @@
+/* app.js — reproductor: cola, historial, modo audio/video, género, letra, visualizador. */
+(function () {
+  'use strict';
+
+  const $ = (id) => document.getElementById(id);
+  const U = window.Util;
+  const media = $('media');   /* audio: siempre suena; es el reloj maestro */
+  const vid = $('vid');       /* video sin sonido: solo en modo video, sigue al audio */
+  const params = new URLSearchParams(location.search);
+
+  const state = {
+    mode: 'audio',
+    queue: [],          /* próximas pistas ya pedidas al servidor */
+    current: null,      /* { track, genre, genreChanged } */
+    history: U.createHistory(50),
+    genres: [],
+    lockedGenre: null,
+    loading: false,
+    failures: 0,
+    toppingUp: false,
+    seeking: false,
+    lyrics: { open: false, lines: null, idx: -1, timer: 0 }
+  };
+
+  /* ── utilidades ─────────────────────────────────────────────── */
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (_) { return d; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (_) { /* modo privado */ } }
+  };
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  /* Si la página se abre desde otro equipo, el token viaja en cada petición (?t=). */
+  const TOKEN = params.get('t') || '';
+  const withT = (u) => (TOKEN ? u + (u.includes('?') ? '&' : '?') + 't=' + encodeURIComponent(TOKEN) : u);
+  const playUrl = (id, mode) => withT('/api/play/' + id + '?mode=' + mode);
+  const thumbUrl = (id) => withT('/api/thumb/' + id);
+
+  let toastTimer = 0;
+  function toast(msg, ms) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), ms || 3200);
+  }
+
+  async function getJson(url) {
+    const r = await fetch(withT(url));
+    if (!r.ok) throw Object.assign(new Error('HTTP ' + r.status), { status: r.status });
+    return r.json();
+  }
+
+  /* ── cola y servidor ────────────────────────────────────────── */
+  function fetchNext(opts) {
+    const q = new URLSearchParams();
+    if (opts && opts.genre) q.set('genre', opts.genre);
+    if (opts && opts.change) q.set('change', '1');
+    if (opts && opts.query) q.set('q', opts.query);
+    return getJson('/api/next' + (q.toString() ? '?' + q : ''));
+  }
+
+  /* Reintenta con espera creciente: sin conexión no se queda mudo ni rompe nada. */
+  async function fetchNextPatient(opts) {
+    for (let i = 0; ; i++) {
+      try { return await fetchNext(opts); }
+      catch (e) {
+        if (e.status === 400) throw e;
+        setStatus('Sin conexión con YouTube — reintentando…');
+        await sleep(Math.min(3000 * (i + 1), 30000));
+      }
+    }
+  }
+
+  /* En modo video, pide 1 byte del video de la SIGUIENTE pista: así yt-dlp ya lo resolvió cuando le toque. */
+  function warmVideo(item) {
+    if (state.mode !== 'video' || !item) return;
+    fetch(playUrl(item.track.id, 'video'), { headers: { range: 'bytes=0-0' } }).then((r) => r.body && r.body.cancel()).catch(() => {});
+  }
+
+  async function topUp() {
+    if (state.toppingUp) return;
+    state.toppingUp = true;
+    try {
+      while (state.queue.length < 2) state.queue.push(await fetchNext());
+    } catch (_) { /* se reintenta en la siguiente pista */ }
+    state.toppingUp = false;
+    warmVideo(state.queue[0]);
+    renderUpNext();
+  }
+
+  /* ── reproducción ───────────────────────────────────────────── */
+  function setAccent(color) {
+    const glow = $('glow');
+    glow.style.opacity = '0';
+    setTimeout(() => { document.documentElement.style.setProperty('--accent', color || '#F59B23'); glow.style.opacity = '1'; }, 250);
+  }
+
+  function setStatus(msg) { $('channel').textContent = msg; }
+
+  function renderGenre(g, changed) {
+    U.setEmoji($('gpEmoji'), g.emoji || '🎵');
+    $('gpLabel').textContent = g.label;
+    $('gpLock').hidden = !state.lockedGenre || g.id === 'search' || g.id === 'podcast';
+    const pill = $('genrePill');
+    pill.style.borderColor = g.color || '';
+    if (changed) { pill.classList.remove('pop'); void pill.offsetWidth; pill.classList.add('pop'); }
+  }
+
+  function setBusy(on) {
+    document.body.classList.toggle('busy', on);
+    if (on) $('upnext').textContent = 'Buscando música…';
+  }
+
+  function renderUpNext() {
+    const n = state.queue[0];
+    const el = $('upnext');
+    if (!n) { el.textContent = ''; return; }
+    const sw = state.current && n.genre.id !== state.current.genre.id ? ' · ' + n.genre.label : '';
+    el.innerHTML = 'Sigue: <b></b>' + sw.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    el.querySelector('b').textContent = n.track.title;
+  }
+
+  function setArt(id) {
+    const img = $('artImg');
+    img.classList.remove('on');
+    img.onload = () => img.classList.add('on');
+    img.onerror = () => img.classList.remove('on');
+    img.src = thumbUrl(id);
+  }
+
+  function loadSrc() {
+    media.src = playUrl(state.current.track.id, 'audio');
+    syncVideoSource();
+    startPlayback();
+  }
+
+  /* El video solo se pide en modo video; al volver a audio se libera. */
+  function syncVideoSource() {
+    if (state.mode === 'video' && state.current) {
+      vid.poster = thumbUrl(state.current.track.id); /* se ve la carátula hasta el primer cuadro (no un recuadro negro) */
+      vid.src = playUrl(state.current.track.id, 'video');
+      vid.addEventListener('loadedmetadata', () => {
+        try { vid.currentTime = media.currentTime; } catch (_) { /* sin seek */ }
+        if (!media.paused) vid.play().catch(() => {});
+      }, { once: true });
+    } else if (vid.getAttribute('src')) {
+      vid.pause(); vid.removeAttribute('src'); vid.removeAttribute('poster'); vid.load();
+    }
+  }
+
+  function startPlayback() {
+    const p = media.play();
+    if (p && p.catch) p.catch((e) => { if (e.name === 'NotAllowedError') $('start').hidden = false; });
+  }
+
+  function playItem(item) {
+    state.current = item;
+    const t = item.track;
+    $('title').textContent = t.title;
+    $('title').classList.toggle('long', t.title.length > 60); /* letra más chica para que se lea completo */
+    $('channel').textContent = t.channel || '';
+    $('tNow').textContent = '0:00';
+    $('tDur').textContent = U.fmtTime(t.duration);
+    setRange($('seek'), 0);
+    document.title = '▶ ' + t.title;
+    setArt(t.id);
+    setAccent(item.genre.color);
+    renderGenre(item.genre, item.genreChanged);
+    renderUpNext();
+    setMediaSession(item);
+    loadSrc();
+    reportState();
+    if (state.lyrics.open) loadLyrics();
+  }
+
+  async function advance() {
+    if (state.loading) return;
+    state.loading = true;
+    try {
+      if (state.current) state.history.push(state.current);
+      if (!state.queue.length) setBusy(true);
+      const item = state.queue.shift() || await fetchNextPatient();
+      playItem(item);
+      topUp();
+    } finally { state.loading = false; setBusy(false); }
+  }
+
+  function prev() {
+    if (media.currentTime > 3 || state.history.size() === 0) { media.currentTime = 0; return; }
+    const p = state.history.pop();
+    if (state.current) state.queue.unshift(state.current);
+    playItem(p);
+  }
+
+  /* Un solo intento: si falla se avisa y se sigue con lo que suena. lock = género que se fija (o null). */
+  /* keepQueue: pauta única (búsqueda): la cola y el género fijado se quedan como estaban. */
+  async function switchTo(opts, { lock = null, keepQueue = false } = {}) {
+    if (state.loading) return;
+    state.loading = true;
+    const before = state.lockedGenre;
+    setBusy(true);
+    try {
+      const item = await fetchNext(opts);
+      if (!keepQueue) { state.lockedGenre = lock; state.queue.length = 0; }
+      if (state.current) state.history.push(state.current);
+      playItem(item);
+      topUp();
+    } catch (_) {
+      state.lockedGenre = before;
+      toast(opts.query ? 'No encontré resultados para esa búsqueda.' : 'No se encontró música para ese género. Prueba otro.');
+    } finally { state.loading = false; setBusy(false); renderUpNext(); }
+  }
+  const changeGenre = (id) => switchTo(id ? { genre: id } : { change: true }, { lock: id || null });
+  const playQuery = (q) => switchTo({ query: q }, { keepQueue: true });
+
+  /* Un episodio o canción concreta (viene del control remoto): suena ahora y la lista sigue como estaba. */
+  const KIND_GENRE = {
+    podcast: { id: 'podcast', label: 'Podcast', emoji: '🎙️', color: '#a78bfa' },
+    search: { id: 'search', label: 'Búsqueda', emoji: '🔎', color: '#F59B23' }
+  };
+  function playTrackOnce(track, kind) {
+    if (state.loading) return;
+    if (state.current) state.history.push(state.current);
+    playItem({ track, genre: Object.assign({}, KIND_GENRE[kind] || KIND_GENRE.search), genreChanged: true });
+    topUp();
+  }
+
+  function toggle() { if (media.paused) startPlayback(); else media.pause(); }
+
+  /* ── errores y vigilancia ───────────────────────────────────── */
+  async function onFail(reason) {
+    if (state.loading || !state.current) return;
+    /* Primero se reintenta la misma pista una vez (URL caducada, Pi ocupada); después se salta. */
+    if (state.retryId !== state.current.track.id) {
+      state.retryId = state.current.track.id;
+      toast('Reintentando…', 1800);
+      loadSrc();
+      return;
+    }
+    state.failures++;
+    if (state.failures >= 5) {
+      setStatus('Sin conexión con YouTube — reintentando en 30 s');
+      toast('Varias pistas seguidas fallaron. Reintento en 30 s.', 5000);
+      state.failures = 0;
+      await sleep(30000);
+    } else {
+      toast(reason + ' Saltando a la siguiente…');
+      await sleep(900);
+    }
+    advance();
+  }
+
+  let stallTimer = 0;
+  const armStall = () => { clearTimeout(stallTimer); stallTimer = setTimeout(() => onFail('La pista no avanza.'), 20000); };
+  const clearStall = () => clearTimeout(stallTimer);
+
+  media.addEventListener('error', () => {
+    if (media.error && media.error.code === 1) return; /* abortado por cambio de pista */
+    onFail('No se pudo reproducir.');
+  });
+  media.addEventListener('waiting', () => { armStall(); vid.pause(); });
+  media.addEventListener('stalled', armStall);
+  media.addEventListener('playing', () => {
+    clearStall(); state.failures = 0; setPlayIcon(true); ensureAudioGraph(); startVis(); reportState();
+    if (vid.getAttribute('src')) vid.play().catch(() => {});
+  });
+  media.addEventListener('pause', () => { clearStall(); setPlayIcon(false); vid.pause(); reportState(); });
+  media.addEventListener('seeked', () => { if (vid.getAttribute('src')) { try { vid.currentTime = media.currentTime; } catch (_) { /* sin seek */ } } });
+  media.addEventListener('ended', () => advance());
+
+  /* El video sigue al audio: si se desfasa más de 0.35 s se reengancha. */
+  setInterval(() => {
+    if (!vid.getAttribute('src') || media.paused || vid.readyState < 2) return;
+    if (Math.abs(vid.currentTime - media.currentTime) > 0.35) { try { vid.currentTime = media.currentTime; } catch (_) { /* sin seek */ } }
+  }, 2000);
+  /* Sin video disponible la música sigue: se vuelve a solo audio. */
+  vid.addEventListener('error', () => {
+    if (!vid.getAttribute('src') || (vid.error && vid.error.code === 1)) return;
+    toast('El video no está disponible, seguimos con audio.');
+    setMode('audio');
+  });
+
+  /* ── progreso / volumen ─────────────────────────────────────── */
+  function setRange(el, pct) { el.style.setProperty('--p', pct + '%'); }
+
+  function duration() {
+    return Number.isFinite(media.duration) && media.duration > 0 ? media.duration : (state.current ? state.current.track.duration : 0) || 0;
+  }
+
+  media.addEventListener('timeupdate', () => {
+    clearStall();
+    if (state.seeking) return;
+    const d = duration();
+    const pct = d ? Math.min(100, (media.currentTime / d) * 100) : 0;
+    $('seek').value = pct * 10;
+    setRange($('seek'), pct);
+    $('tNow').textContent = U.fmtTime(media.currentTime);
+    $('tDur').textContent = U.fmtTime(d);
+  });
+
+  const seek = $('seek');
+  seek.addEventListener('pointerdown', () => { state.seeking = true; });
+  seek.addEventListener('input', () => {
+    const d = duration();
+    setRange(seek, seek.value / 10);
+    $('tNow').textContent = U.fmtTime((seek.value / 1000) * d);
+  });
+  seek.addEventListener('change', () => {
+    const d = duration();
+    if (d) { try { media.currentTime = (seek.value / 1000) * d; } catch (_) { /* sin seek */ } }
+    state.seeking = false;
+  });
+
+  function setPlayIcon(playing) {
+    $('playIco').firstElementChild.setAttribute('href', playing ? '#i-pause' : '#i-play');
+    $('btnPlay').setAttribute('aria-label', playing ? 'Pausar' : 'Reproducir');
+  }
+
+  const vol = $('vol');
+  function applyVolume() {
+    const v = Number(vol.value);
+    media.volume = v / 100;
+    setRange(vol, v);
+    const muted = media.muted || v === 0;
+    $('muteIco').firstElementChild.setAttribute('href', muted ? '#i-mute' : '#i-vol');
+    store.set('pl_vol', String(v));
+    reportState();
+  }
+  vol.addEventListener('input', () => { if (media.muted && vol.value > 0) media.muted = false; applyVolume(); });
+  function nudgeVolume(d) { vol.value = Math.max(0, Math.min(100, Number(vol.value) + d)); media.muted = false; applyVolume(); toast('Volumen ' + vol.value + '%', 900); }
+  function setVolumeValue(v) { vol.value = Math.max(0, Math.min(100, v)); media.muted = false; applyVolume(); toast('Volumen ' + vol.value + '%', 900); }
+  function toggleMute() { media.muted = !media.muted; applyVolume(); }
+
+  /* ── modo audio / video ─────────────────────────────────────── */
+  function setMode(m) {
+    state.mode = m;
+    document.body.dataset.mode = m;
+    $('modeIco').firstElementChild.setAttribute('href', m === 'video' ? '#i-music' : '#i-video');
+    $('modeLbl').textContent = m === 'video' ? 'Solo audio' : 'Video';
+    $('btnMode').setAttribute('aria-pressed', String(m === 'video'));
+    $('btnMode').setAttribute('aria-label', m === 'video' ? 'Cambiar a solo audio' : 'Cambiar a video');
+    store.set('pl_mode', m);
+    syncVideoSource(); /* el audio no se toca: cambiar de modo no corta la música */
+    warmVideo(state.queue[0]);
+    reportState();
+  }
+
+  /* ── géneros ────────────────────────────────────────────────── */
+  function buildChips() {
+    const box = $('chips');
+    const sorted = state.genres.slice().sort((a, b) => (b.featured - a.featured) || a.label.localeCompare(b.label, 'es'));
+    const frag = document.createDocumentFragment();
+    sorted.forEach((g) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'chip'; b.dataset.id = g.id; b.dataset.q = (g.label + ' ' + g.id).toLowerCase();
+      b.style.setProperty('--c', g.color || '');
+      const e = document.createElement('span'); e.className = 'e'; U.setEmoji(e, g.emoji || '🎵');
+      const l = document.createElement('span'); l.className = 'l'; l.textContent = g.label;
+      b.append(e, l);
+      frag.appendChild(b);
+    });
+    box.replaceChildren(frag);
+  }
+
+  function openSheet() {
+    $('sheet').hidden = false;
+    $('genreFilter').value = '';
+    filterChips('');
+    document.querySelectorAll('.chip').forEach((c) => c.classList.toggle('on', c.dataset.id === state.lockedGenre));
+  }
+  const closeSheet = () => { $('sheet').hidden = true; };
+  function filterChips(q) {
+    q = q.trim().toLowerCase();
+    document.querySelectorAll('.chip').forEach((c) => { c.hidden = !!q && !c.dataset.q.includes(q); });
+  }
+
+  /* ── letra ──────────────────────────────────────────────────── */
+  async function loadLyrics() {
+    const body = $('lyrBody');
+    const t = state.current && state.current.track;
+    if (!t) return;
+    $('lyrTitle').textContent = t.title;
+    state.lyrics.lines = null; state.lyrics.idx = -1;
+    body.innerHTML = '<p class="lyr-msg">Buscando letra…</p>';
+    const q = new URLSearchParams({ title: t.title, channel: t.channel || '', duration: String(t.duration || 0) });
+    const mine = t.id;
+    let data = null;
+    try { data = await getJson('/api/lyrics?' + q); } catch (_) { /* sin letra */ }
+    if (!state.current || state.current.track.id !== mine) return; /* cambió la pista */
+    body.replaceChildren();
+    if (!data) { const p = document.createElement('p'); p.className = 'lyr-msg'; p.textContent = 'No hay letra para esta canción.'; body.appendChild(p); return; }
+    if (data.synced && data.synced.length) {
+      state.lyrics.lines = data.synced;
+      data.synced.forEach((l, i) => { const d = document.createElement('div'); d.className = 'lyr-line'; d.dataset.i = i; d.textContent = l.text; body.appendChild(d); });
+      body.scrollTop = 0;
+      tickLyrics();
+    } else {
+      const pre = document.createElement('div'); pre.className = 'lyr-plain'; pre.textContent = data.plain; body.appendChild(pre);
+    }
+  }
+
+  function tickLyrics() {
+    const L = state.lyrics;
+    if (!L.lines) return;
+    const i = U.activeLine(L.lines, media.currentTime);
+    if (i === L.idx) return;
+    L.idx = i;
+    const kids = $('lyrBody').children;
+    for (let k = 0; k < kids.length; k++) kids[k].className = 'lyr-line' + (k === i ? ' on' : k < i ? ' past' : '');
+    if (kids[i]) kids[i].scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+
+  function openLyrics() {
+    state.lyrics.open = true;
+    $('lyrics').hidden = false;
+    state.lyrics.timer = setInterval(tickLyrics, 200);
+    loadLyrics();
+  }
+  function closeLyrics() {
+    state.lyrics.open = false;
+    $('lyrics').hidden = true;
+    clearInterval(state.lyrics.timer);
+  }
+
+  /* ── visualizador (analizador real si se puede; si no, barras sintéticas) ── */
+  const canvas = $('vis');
+  const cx = canvas.getContext('2d');
+  let analyser = null, freq = null, audioCtx = null, visOn = params.get('vis') !== '0', visRaf = 0, lastFrame = 0;
+  const BARS = 40;
+
+  async function ensureAudioGraph() {
+    if (analyser || !visOn) return;
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = audioCtx || (audioCtx = new Ctx());
+      if (ctx.state !== 'running') await ctx.resume().catch(() => {});
+      /* Si el navegador no deja arrancar el contexto, NO se conecta: el audio
+       * quedaría mudo. Se reintenta en el primer gesto del usuario. */
+      if (ctx.state !== 'running') return;
+      const src = ctx.createMediaElementSource(media);
+      const an = ctx.createAnalyser();
+      an.fftSize = 128; an.smoothingTimeConstant = 0.8;
+      src.connect(an); an.connect(ctx.destination);
+      analyser = an; freq = new Uint8Array(an.frequencyBinCount);
+    } catch (_) { visOn = visOn && !!analyser; }
+  }
+
+  function sizeCanvas() {
+    const r = canvas.getBoundingClientRect();
+    const w = Math.max(1, Math.round(r.width)), h = Math.max(1, Math.round(r.height));
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+  }
+
+  function drawVis(ts) {
+    visRaf = requestAnimationFrame(drawVis);
+    if (ts - lastFrame < 33) return; /* ~30 fps */
+    lastFrame = ts;
+    sizeCanvas();
+    const w = canvas.width, h = canvas.height;
+    cx.clearRect(0, 0, w, h);
+    const playing = !media.paused;
+    if (analyser && playing) analyser.getByteFrequencyData(freq);
+    const gap = w / BARS, bw = gap * 0.62;
+    const grad = cx.createLinearGradient(0, h, 0, 0);
+    grad.addColorStop(0, '#F59B23');
+    grad.addColorStop(1, getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#F7B84B');
+    cx.fillStyle = grad;
+    let any = false;
+    for (let i = 0; i < BARS; i++) {
+      let v;
+      if (analyser) v = playing ? freq[Math.floor((i / BARS) * freq.length * 0.75)] / 255 : 0;
+      else v = playing ? 0.25 + 0.35 * Math.abs(Math.sin(ts / 420 + i * 0.7)) * (0.6 + 0.4 * Math.sin(ts / 910 + i)) : 0;
+      if (v > 0.01) any = true;
+      const bh = Math.max(2, v * h * 0.95);
+      cx.fillRect(i * gap + (gap - bw) / 2, h - bh, bw, bh);
+    }
+    if (!playing && !any) { cancelAnimationFrame(visRaf); visRaf = 0; cx.clearRect(0, 0, w, h); }
+  }
+  function startVis() { if (visOn && !visRaf && !matchMedia('(prefers-reduced-motion: reduce)').matches) visRaf = requestAnimationFrame(drawVis); }
+
+  /* ── Media Session (teclas multimedia, pantalla de bloqueo) ── */
+  function setMediaSession(item) {
+    if (!('mediaSession' in navigator)) return;
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: item.track.title, artist: item.track.channel || '', album: item.genre.label,
+        artwork: [{ src: location.origin + thumbUrl(item.track.id), sizes: '1280x720', type: 'image/jpeg' }]
+      });
+    } catch (_) { /* navegador sin soporte */ }
+  }
+  if ('mediaSession' in navigator) {
+    const set = (a, f) => { try { navigator.mediaSession.setActionHandler(a, f); } catch (_) { /* no soportado */ } };
+    set('play', startPlayback); set('pause', () => media.pause());
+    set('previoustrack', prev); set('nexttrack', advance);
+    set('seekto', (d) => { if (d.seekTime != null) media.currentTime = d.seekTime; });
+  }
+
+  /* ── eventos de la interfaz ─────────────────────────────────── */
+  $('btnPlay').addEventListener('click', toggle);
+  $('btnNext').addEventListener('click', advance);
+  $('btnPrev').addEventListener('click', prev);
+  $('btnMute').addEventListener('click', toggleMute);
+  $('btnShuffle').addEventListener('click', () => changeGenre(null));
+  $('btnGenres').addEventListener('click', openSheet);
+  $('genrePill').addEventListener('click', openSheet);
+  $('btnMode').addEventListener('click', () => setMode(state.mode === 'video' ? 'audio' : 'video'));
+  $('btnLyrics').addEventListener('click', () => (state.lyrics.open ? closeLyrics() : openLyrics()));
+  $('lyrClose').addEventListener('click', closeLyrics);
+  $('sheetClose').addEventListener('click', closeSheet);
+  $('btnRandom').addEventListener('click', () => { closeSheet(); changeGenre(null); });
+  $('genreFilter').addEventListener('input', (e) => filterChips(e.target.value));
+  $('chips').addEventListener('click', (e) => {
+    const c = e.target.closest('.chip');
+    if (c) { closeSheet(); changeGenre(c.dataset.id); }
+  });
+  $('start').addEventListener('click', () => { $('start').hidden = true; startPlayback(); ensureAudioGraph(); });
+  $('art').addEventListener('click', toggle);
+
+  /* Primer gesto: permite arrancar el AudioContext del visualizador. */
+  ['pointerdown', 'keydown'].forEach((ev) => addEventListener(ev, () => { if (!analyser && !media.paused) ensureAudioGraph(); }, { passive: true }));
+
+  addEventListener('keydown', (e) => {
+    if (e.target.matches('input[type="search"], input[type="text"]')) { if (e.key === 'Escape') closeSheet(); return; }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const k = e.key;
+    if (k === 'Escape') { closeSheet(); closeLyrics(); return; }
+    if (k === ' ') { e.preventDefault(); toggle(); }
+    else if (k === 'ArrowRight' || k === 'n' || k === 'N') advance();
+    else if (k === 'ArrowLeft' || k === 'p' || k === 'P') prev();
+    else if (k === 'ArrowUp') { e.preventDefault(); nudgeVolume(5); }
+    else if (k === 'ArrowDown') { e.preventDefault(); nudgeVolume(-5); }
+    else if (k === 'm' || k === 'M') toggleMute();
+    else if (k === 'v' || k === 'V') $('btnMode').click();
+    else if (k === 'l' || k === 'L') $('btnLyrics').click();
+    else if (k === 'g' || k === 'G') openSheet();
+    else if (k === 'r' || k === 'R') changeGenre(null);
+    else if (k === 'i' || k === 'I') toggleInfo();
+  });
+
+  /* Cursor oculto tras 4 s sin moverlo (monitor de sala). */
+  let idleTimer = 0;
+  const wake = () => { document.body.classList.remove('idle'); clearTimeout(idleTimer); idleTimer = setTimeout(() => document.body.classList.add('idle'), 4000); };
+  addEventListener('mousemove', wake, { passive: true });
+  wake();
+
+  /* ── control remoto (SSH / web /remote) ─────────────────────── */
+  let lastReport = 0, reportTimer = 0;
+  function reportState() {
+    clearTimeout(reportTimer);
+    reportTimer = setTimeout(() => {
+      lastReport = Date.now();
+      const cur = state.current;
+      fetch(withT('/api/state'), {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ paused: media.paused, muted: media.muted, volume: Number(vol.value), mode: state.mode, time: media.currentTime, track: cur && cur.track, genre: cur && cur.genre })
+      }).catch(() => {});
+    }, Math.max(0, 800 - (Date.now() - lastReport)));
+  }
+  setInterval(() => { if (!media.paused) reportState(); }, 5000);
+
+  const CMD_LABEL = { toggle: 'Pausa / play', play: 'Play', pause: 'Pausa', next: 'Siguiente', prev: 'Anterior', random: 'Otro género al azar', mute: 'Silenciar', lyrics: 'Letra' };
+  function handleCommand(c) {
+    if (CMD_LABEL[c.cmd]) toast('Remoto · ' + CMD_LABEL[c.cmd], 1500);
+    switch (c.cmd) {
+      case 'toggle': toggle(); break;
+      case 'play': startPlayback(); break;
+      case 'pause': media.pause(); break;
+      case 'next': advance(); break;
+      case 'prev': prev(); break;
+      case 'random': changeGenre(null); break;
+      case 'genre': toast('Remoto · género', 1500); changeGenre(c.id); break;
+      case 'search': toast('Remoto · buscando "' + c.q + '"', 2500); playQuery(c.q); break;
+      case 'track': toast('Remoto · ' + (c.kind === 'podcast' ? 'podcast' : 'canción'), 2000); playTrackOnce(c.track, c.kind); break;
+      case 'volume': if (c.set !== undefined) setVolumeValue(c.set); else nudgeVolume(c.delta); break;
+      case 'mute': toggleMute(); break;
+      case 'mode': setMode(c.mode); break;
+      case 'lyrics': $('btnLyrics').click(); break;
+      default: break;
+    }
+  }
+  function connectEvents() {
+    if (!window.EventSource) return;
+    const es = new EventSource(withT('/api/events')); /* se reconecta solo */
+    es.onmessage = (e) => { try { handleCommand(JSON.parse(e.data)); } catch (_) { /* orden mal formada */ } };
+  }
+
+  /* ── dirección de la Pi en pantalla (para administrarla cuando cambia la IP) ── */
+  let infoTimer = 0;
+  function showInfo(ms) {
+    $('info').hidden = false;
+    clearTimeout(infoTimer);
+    if (ms) infoTimer = setTimeout(() => { $('info').hidden = true; }, ms);
+  }
+  function toggleInfo() {
+    if ($('info').hidden) showInfo(0);
+    else { $('info').hidden = true; clearTimeout(infoTimer); }
+  }
+  async function loadInfo() {
+    try {
+      const h = await getJson('/api/health');
+      const ips = h.ips && h.ips.length ? h.ips : [location.hostname];
+      $('infoText').textContent = 'Control remoto: ' + ips.map((ip) => 'http://' + ip + ':' + (location.port || 80) + '/remote').join('  ·  ');
+      showInfo(25000); /* tras un reinicio se ve la IP nueva unos segundos */
+    } catch (_) { /* sin dato: no se muestra */ }
+  }
+  $('brand').addEventListener('click', toggleInfo);
+
+  /* ── arranque ───────────────────────────────────────────────── */
+  async function init() {
+    vol.value = store.get('pl_vol', '80');
+    applyVolume();
+    /* ?mode=video|audio en la dirección manda (el kiosco se cierra a la fuerza y no siempre guarda el último modo). */
+    const startMode = params.get('mode') || store.get('pl_mode', 'audio');
+    if (startMode === 'video') { state.mode = 'video'; setMode('video'); }
+    try { state.genres = await getJson('/api/genres'); buildChips(); } catch (_) { /* el selector quedará vacío */ }
+    connectEvents();
+    loadInfo();
+    advance();
+  }
+  init();
+})();

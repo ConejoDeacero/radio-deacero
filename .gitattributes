@@ -1,0 +1,5 @@
+# Los scripts y unidades que van a la Raspberry Pi deben conservar saltos de línea de Linux (LF)
+deploy/* text eol=lf
+*.sh text eol=lf
+*.service text eol=lf
+*.timer text eol=lf

@@ -1,0 +1,16 @@
+# dependencias y datos de ejecución
+node_modules/
+data/podcasts.json
+data/history.json
+*.tmp
+
+# secretos
+.env
+.env.*
+
+# documento con datos internos de red (MACs, DNS, direcciones): se queda en el equipo, no se publica
+docs/SOLICITUD-IP-FIJA.md
+
+# sistema
+.DS_Store
+Thumbs.db

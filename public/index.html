@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>DEACERO Play</title>
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="assets/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body data-mode="audio">
+
+<!-- Iconos (sin librería externa: nada que cargar) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></symbol>
+  <symbol id="i-prev" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></symbol>
+  <symbol id="i-next" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></symbol>
+  <symbol id="i-shuffle" viewBox="0 0 24 24"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></symbol>
+  <symbol id="i-video" viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></symbol>
+  <symbol id="i-music" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></symbol>
+  <symbol id="i-vol" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></symbol>
+  <symbol id="i-mute" viewBox="0 0 24 24"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24"><path d="M4 8h4V4H4v4zm6 12h4v-4h-4v4zm-6 0h4v-4H4v4zm0-6h4v-4H4v4zm6 0h4v-4h-4v4zm6-10v4h4V4h-4zm-6 4h4V4h-4v4zm6 6h4v-4h-4v4zm0 6h4v-4h-4v4z"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></symbol>
+</svg>
+
+<div class="glow" id="glow" aria-hidden="true"></div>
+
+<header class="top">
+  <div class="brand" id="brand" title="Mostrar la dirección de control (I)">
+    <img src="assets/favicon.svg" alt="" width="32" height="32">
+    <div class="brand-name">DEACERO <em>PLAY</em></div>
+  </div>
+  <button type="button" class="genre-pill" id="genrePill" aria-haspopup="dialog" aria-label="Elegir género">
+    <span class="gp-emoji" id="gpEmoji">🎵</span>
+    <span class="gp-label" id="gpLabel">Elige tu música</span>
+    <svg class="gp-lock" id="gpLock" aria-hidden="true" hidden><use href="#i-lock"/></svg>
+  </button>
+</header>
+
+<main class="stage">
+  <section class="art" id="art" aria-label="Carátula">
+    <img id="artImg" alt="" decoding="async">
+    <audio id="media" preload="auto"></audio>
+    <video id="vid" muted playsinline preload="auto"></video>
+    <canvas id="vis" aria-hidden="true"></canvas>
+    <div class="art-empty" id="artEmpty"><svg aria-hidden="true"><use href="#i-music"/></svg></div>
+  </section>
+
+  <section class="panel">
+    <div class="meta" role="status" aria-live="polite" aria-atomic="true">
+      <h1 class="title" id="title">Preparando tu música…</h1>
+      <p class="channel" id="channel">&nbsp;</p>
+    </div>
+
+    <div class="progress-row">
+      <span class="time" id="tNow">0:00</span>
+      <input type="range" class="range seek" id="seek" min="0" max="1000" value="0" step="1" aria-label="Progreso de la canción">
+      <span class="time" id="tDur">–:––</span>
+    </div>
+
+    <div class="transport">
+      <button type="button" class="btn" id="btnPrev" aria-label="Anterior" title="Anterior (←)"><svg><use href="#i-prev"/></svg></button>
+      <button type="button" class="btn btn-play" id="btnPlay" aria-label="Pausar" title="Reproducir / pausar (espacio)"><svg id="playIco"><use href="#i-pause"/></svg></button>
+      <button type="button" class="btn" id="btnNext" aria-label="Siguiente" title="Siguiente (→)"><svg><use href="#i-next"/></svg></button>
+    </div>
+
+    <div class="volume-row">
+      <button type="button" class="btn btn-sm" id="btnMute" aria-label="Silenciar" title="Silenciar (M)"><svg id="muteIco"><use href="#i-vol"/></svg></button>
+      <input type="range" class="range" id="vol" min="0" max="100" value="80" step="1" aria-label="Volumen">
+    </div>
+
+    <div class="actions">
+      <button type="button" class="btn btn-act" id="btnShuffle" aria-label="Cambiar a otro género al azar" title="Otro género al azar (R)"><svg><use href="#i-shuffle"/></svg><span>Al azar</span></button>
+      <button type="button" class="btn btn-act" id="btnGenres" aria-label="Elegir género" title="Elegir género (G)"><svg><use href="#i-grid"/></svg><span>Géneros</span></button>
+      <button type="button" class="btn btn-act" id="btnMode" aria-label="Cambiar a video" aria-pressed="false" title="Audio / video (V)"><svg id="modeIco"><use href="#i-video"/></svg><span id="modeLbl">Video</span></button>
+      <button type="button" class="btn btn-act" id="btnLyrics" aria-label="Ver letra" title="Letra (L)"><svg><use href="#i-mic"/></svg><span>Letra</span></button>
+    </div>
+
+    <p class="upnext" id="upnext"></p>
+  </section>
+</main>
+
+<!-- Selector de géneros -->
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" hidden>
+  <div class="sheet-head">
+    <h2 id="sheetTitle">Elige un género</h2>
+    <input type="search" id="genreFilter" class="filter" placeholder="Buscar género…" autocomplete="off" aria-label="Buscar género">
+    <button type="button" class="btn btn-act" id="btnRandom"><svg><use href="#i-shuffle"/></svg><span>Aleatorio</span></button>
+    <button type="button" class="btn btn-sm" id="sheetClose" aria-label="Cerrar"><svg><use href="#i-close"/></svg></button>
+  </div>
+  <div class="chips" id="chips"></div>
+</div>
+
+<!-- Letra / karaoke -->
+<div class="lyrics" id="lyrics" role="dialog" aria-modal="true" aria-label="Letra" hidden>
+  <button type="button" class="btn btn-sm lyr-close" id="lyrClose" aria-label="Cerrar letra"><svg><use href="#i-close"/></svg></button>
+  <div class="lyr-head"><div class="lyr-title" id="lyrTitle"></div></div>
+  <div class="lyr-body" id="lyrBody"></div>
+</div>
+
+<button type="button" class="start" id="start" hidden>
+  <svg aria-hidden="true"><use href="#i-play"/></svg>
+  <span>Toca para empezar</span>
+</button>
+
+<div class="info" id="info" hidden><span id="infoText"></span></div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="js/util.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
