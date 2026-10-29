@@ -239,13 +239,16 @@ body[data-mode="video"] #vis { opacity: .55; }
 
 /* ═══ Vista kiosco (/kiosco): video de fondo difuminado + reloj grande al frente ═══
    Solo vista: hora, fecha, canción y la que sigue. Todo se maneja desde /remote.
-   El "blur" es un video reducido a 96×54 px y escalado a pantalla completa (suavizado bilineal): se distingue
-   el video pero sin detalle, y cuesta casi nada a una Raspberry Pi (un blur CSS a 1080p la hace tropezar). */
+   El "blur" es un video reducido a ~240×135 px y escalado a pantalla completa (suavizado bilineal): se distingue
+   el video pero suave, y cuesta casi nada a una Raspberry Pi (un blur CSS a 1080p la hace tropezar). */
 .bg, .clockbox { display: none; }
 body[data-view="kiosco"] .glow, body[data-view="kiosco"] .top, body[data-view="kiosco"] .info,
 body[data-view="kiosco"] .progress-row, body[data-view="kiosco"] .transport, body[data-view="kiosco"] .volume-row,
 body[data-view="kiosco"] .actions { display: none; }
-body[data-view="kiosco"] { grid-template-rows: minmax(0, 1fr); } /* sin encabezado: una sola fila a pantalla completa (si no, el contenido queda arriba) */
+body[data-view="kiosco"] {
+  grid-template-rows: minmax(0, 1fr); /* sin encabezado: una sola fila a pantalla completa (si no, el contenido queda arriba) */
+  --vw: calc(1vw * var(--k, 1)); /* 1vw del ANCHO REAL de la pantalla: --k = 2 si el panel estira el doble a lo ancho (?estirar=2) */
+}
 body[data-view="kiosco"] .bg { display: block; position: fixed; inset: 0; z-index: 0; overflow: hidden; background: #000; }
 body[data-view="kiosco"] .bg canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: auto; transform: scale(1.12); }
 body[data-view="kiosco"] .bg-dim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.38), rgba(0,0,0,.55) 55%, rgba(0,0,0,.72)); }
@@ -253,24 +256,29 @@ body[data-view="kiosco"] .bg-dim { position: absolute; inset: 0; background: lin
 /* La carátula/video del reproductor sigue existiendo (el video debe seguir decodificándose) pero invisible y mínimo */
 body[data-view="kiosco"] .art { position: fixed; left: 0; bottom: 0; width: 2px; height: 2px; opacity: 0; pointer-events: none; overflow: hidden; box-shadow: none; z-index: -1; }
 
-body[data-view="kiosco"] .stage { height: 100%; overflow: hidden; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; align-content: center; justify-items: center; gap: clamp(.6em, 3vh, 1.8em); text-align: center; }
+/* La escena se diseña al ancho real del panel (100vw × --k) y se comprime a 1/--k: el panel la estira de vuelta y las letras salen con su forma. */
+body[data-view="kiosco"] .stage {
+  position: fixed; left: 0; top: 0; z-index: 1; width: calc(100vw * var(--k, 1)); height: 100vh; overflow: hidden;
+  transform: scaleX(calc(1 / var(--k, 1))); transform-origin: 0 0;
+  grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; align-content: center; justify-items: center;
+  gap: clamp(.6em, 3vh, 2.2em); text-align: center;
+}
 body[data-view="kiosco"] .clockbox { display: flex; flex-direction: column; align-items: center; }
 body[data-view="kiosco"] .clock {
-  font-size: clamp(3rem, min(14vw, 22vh), 10rem); font-weight: 800; letter-spacing: -.04em; line-height: 1.05; color: #fff;
+  font-size: clamp(3rem, min(calc(var(--vw) * 14), 25vh), 18rem); font-weight: 800; letter-spacing: -.04em; line-height: 1.05; color: var(--pl-500);
   font-variant-numeric: tabular-nums; text-shadow: 0 2px 30px rgba(0, 0, 0, .55);
-  display: inline-flex; align-items: flex-start; gap: .3em; animation: clockIn .8s var(--ease) backwards;
+  animation: clockIn .8s var(--ease) backwards;
 }
-body[data-view="kiosco"] .clock .ampm { font-size: .28em; font-weight: 700; letter-spacing: .05em; color: var(--pl-500); margin-top: .35em; font-variant-numeric: normal; }
-body[data-view="kiosco"] .clockdate { font-size: clamp(1.1em, min(2.4vw, 4vh), 2.2em); font-weight: 600; color: var(--txt2); margin-top: .2em; text-shadow: 0 2px 20px rgba(0,0,0,.6); }
+body[data-view="kiosco"] .clockdate { font-size: clamp(1.1rem, min(calc(var(--vw) * 2.4), 4.8vh), 3.4rem); font-weight: 600; color: var(--txt2); margin-top: .2em; text-shadow: 0 2px 20px rgba(0,0,0,.6); }
 body[data-view="kiosco"] .clockdate::first-letter { text-transform: uppercase; } /* "Miércoles, 28 de octubre" (no "De") */
 @keyframes clockIn { from { opacity: 0; transform: translateY(10px); } }
 
-body[data-view="kiosco"] .panel { width: 100%; max-width: 60rem; align-items: center; gap: clamp(.4em, 1.6vh, 1em); }
+body[data-view="kiosco"] .panel { width: 100%; max-width: calc(var(--vw) * 70); align-items: center; gap: clamp(.4em, 1.6vh, 1em); }
 body[data-view="kiosco"] .meta { text-align: center; max-width: 100%; }
-body[data-view="kiosco"] .title { font-size: clamp(1.15em, min(2vw, 3.4vh) + .4em, 2em); -webkit-line-clamp: 2; text-shadow: 0 2px 24px rgba(0,0,0,.7); }
-body[data-view="kiosco"] .title.long { font-size: clamp(1.05em, min(1.7vw, 3vh) + .3em, 1.6em); }
-body[data-view="kiosco"] .channel { text-align: center; }
-body[data-view="kiosco"] .upnext { text-align: center; text-shadow: 0 1px 12px rgba(0,0,0,.8); }
+body[data-view="kiosco"] .title { font-size: clamp(1.2rem, min(calc(var(--vw) * 2.8), 5.6vh), 3.8rem); -webkit-line-clamp: 2; text-shadow: 0 2px 24px rgba(0,0,0,.7); }
+body[data-view="kiosco"] .title.long { font-size: clamp(1.05rem, min(calc(var(--vw) * 2.2), 4.4vh), 3rem); }
+body[data-view="kiosco"] .channel { text-align: center; font-size: clamp(.95rem, min(calc(var(--vw) * 1.6), 3.4vh), 2.2rem); }
+body[data-view="kiosco"] .upnext { text-align: center; text-shadow: 0 1px 12px rgba(0,0,0,.8); font-size: clamp(.95rem, min(calc(var(--vw) * 1.6), 3.4vh), 2.2rem); }
 
 /* Pantallas bajas (7" táctil en horizontal): se compacta para que todo quepa */
 @media (max-height: 560px) {

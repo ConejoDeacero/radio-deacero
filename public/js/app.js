@@ -10,6 +10,10 @@
   /* Dos vistas con el mismo reproductor: la normal y /kiosco (video de fondo difuminado + reloj grande). */
   const VIEW = /^\/kiosco\/?$/.test(location.pathname) || params.get('view') === 'kiosco' ? 'kiosco' : 'normal';
   document.body.dataset.view = VIEW;
+  /* Pantalla panorámica alimentada con 1920×1080 y estirada por el panel: ?estirar=2 diseña la vista al ancho real
+     (el doble) y la comprime a la mitad, así las letras salen con su forma normal. 1 = pantalla normal. */
+  const ESTIRAR = Math.min(4, Math.max(1, Number(params.get('estirar')) || 1));
+  document.body.style.setProperty('--k', ESTIRAR);
 
   const state = {
     mode: 'audio',
@@ -319,9 +323,11 @@
   }
 
   const vol = $('vol');
+  let duck = 1; /* 1 = normal; baja mientras suena el locutor (ver más abajo) */
+  function setMediaVolume() { media.volume = Math.max(0, Math.min(1, Number(vol.value) / 100 * duck)); }
   function applyVolume() {
     const v = Number(vol.value);
-    media.volume = v / 100;
+    setMediaVolume();
     setRange(vol, v);
     const muted = media.muted || v === 0;
     $('muteIco').firstElementChild.setAttribute('href', muted ? '#i-mute' : '#i-vol');
@@ -600,15 +606,67 @@
     } catch (_) { /* se conserva el desfase anterior */ }
   }
   function tickClock() {
-    const p = U.clockParts(Date.now() + timeOffset);
+    const now = Date.now() + timeOffset;
+    const p = U.clockParts(now);
     $('clockTime').textContent = p.time;
-    $('clockAmPm').textContent = p.ampm;
     $('clockDate').textContent = p.date;
+    const slot = U.announceSlot(now, ANUNCIAR_CADA);
+    if (slot !== null && slot !== lastSlot) { lastSlot = slot; announce(now); }
   }
 
+  /* ── locutor (solo /kiosco): cada N min suena el jingle y una voz dice la hora, con la música baja ──
+     ?cada=20 (minutos, 0 = apagado) · ?anunciar=1 lo dispara a los 8 s para probarlo. La voz es la del navegador (es-MX). */
+  const ANUNCIAR_CADA = params.has('cada') ? Number(params.get('cada')) : 20;
+  let announcing = false, lastSlot = null;
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  function fadeDuck(to, ms) {
+    return new Promise((resolve) => {
+      const from = duck, t0 = performance.now();
+      const id = setInterval(() => {
+        const k = Math.min(1, (performance.now() - t0) / ms);
+        duck = from + (to - from) * k; setMediaVolume();
+        if (k >= 1) { clearInterval(id); resolve(); }
+      }, 40);
+    });
+  }
+  function playJingle() {
+    return new Promise((resolve) => {
+      const a = new Audio('/assets/jingle.mp3');
+      a.volume = Math.max(0.4, Number(vol.value) / 100);
+      a.addEventListener('ended', resolve); a.addEventListener('error', resolve);
+      setTimeout(resolve, 40000); /* por si nunca termina */
+      a.play().catch(resolve);
+    });
+  }
+  function pickVoice() {
+    const vs = ('speechSynthesis' in window) ? speechSynthesis.getVoices() : [];
+    return vs.find((v) => /^es[-_]MX/i.test(v.lang) && /natural|online/i.test(v.name)) || vs.find((v) => /^es[-_]MX/i.test(v.lang)) || vs.find((v) => /^es/i.test(v.lang)) || null;
+  }
+  function speak(text) {
+    return new Promise((resolve) => {
+      const v = pickVoice();
+      if (!v) return resolve(); /* sin voz en español no se habla (en inglés sonaría mal) */
+      const u = new SpeechSynthesisUtterance(text);
+      u.voice = v; u.lang = v.lang; u.rate = 0.95; u.volume = Math.max(0.5, Number(vol.value) / 100);
+      u.onend = u.onerror = () => resolve();
+      setTimeout(resolve, 20000);
+      speechSynthesis.speak(u);
+    });
+  }
+  async function announce(ms) {
+    if (announcing || media.paused || media.muted) return;
+    announcing = true;
+    try { await fadeDuck(0.12, 600); await playJingle(); await wait(250); await speak(U.spokenTime(ms)); }
+    finally { await fadeDuck(1, 900); announcing = false; }
+  }
+  if ('speechSynthesis' in window) speechSynthesis.getVoices(); /* las voces cargan en segundo plano */
+  if (VIEW === 'kiosco' && params.get('anunciar')) setTimeout(() => announce(Date.now() + timeOffset), 8000);
+
+  const BG_H = 135; /* alto del lienzo de fondo: más alto = menos difuminado (96 era casi solo sombras) */
   const bgCanvas = $('bgCanvas');
+  bgCanvas.height = BG_H; bgCanvas.width = Math.round(BG_H * 16 / 9 * ESTIRAR); /* mismo aspecto que el panel: el video no sale deformado */
   const bgCtx = bgCanvas.getContext('2d', { alpha: false });
-  /* Dibuja el cuadro actual del video (o la carátula) en 32×18 px: el navegador lo escala a pantalla completa y queda difuminado. */
+  /* Dibuja el cuadro actual del video (o la carátula) en un lienzo chico (BG_H px de alto): el navegador lo escala a pantalla completa y queda suave. */
   function drawBg() {
     if (document.hidden) return;
     let src = null, sw = 0, sh = 0;

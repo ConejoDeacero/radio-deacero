@@ -11,7 +11,7 @@ const { describeAgent, cleanIp, cleanUser } = require('./clients');
 const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'application/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.woff2': 'font/woff2',
+  '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.mp3': 'audio/mpeg',
   '.json': 'application/json', '.png': 'image/png', '.ico': 'image/x-icon'
 };
 

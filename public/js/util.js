@@ -50,21 +50,47 @@
     el.appendChild(img);
   }
 
-  /* Reloj del kiosco: hora de 12 h con AM/PM y fecha en español (igual que el kiosco anterior). */
+  /* Reloj del kiosco: hora de 24 h y fecha en español. */
   var DAYS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
   var MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
   function two(n) { return (n < 10 ? '0' : '') + n; }
   function clockParts(ms) {
     var d = new Date(ms);
-    var h = d.getHours();
     return {
-      time: two(h % 12 || 12) + ':' + two(d.getMinutes()) + ':' + two(d.getSeconds()),
-      ampm: h < 12 ? 'AM' : 'PM',
+      time: two(d.getHours()) + ':' + two(d.getMinutes()) + ':' + two(d.getSeconds()),
       date: DAYS[d.getDay()] + ', ' + d.getDate() + ' de ' + MONTHS[d.getMonth()]
     };
   }
 
-  var api = { clockParts: clockParts, fmtTime: fmtTime, activeLine: activeLine, createHistory: createHistory, emojiSrc: emojiSrc, setEmoji: setEmoji };
+  /* Locutor: la hora dicha en palabras (el navegador la lee con su voz en español). */
+  var UNITS = ['cero', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve', 'diez', 'once', 'doce', 'trece', 'catorce', 'quince',
+    'dieciséis', 'diecisiete', 'dieciocho', 'diecinueve', 'veinte', 'veintiuno', 'veintidós', 'veintitrés', 'veinticuatro', 'veinticinco',
+    'veintiséis', 'veintisiete', 'veintiocho', 'veintinueve'];
+  var TENS = ['', '', '', 'treinta', 'cuarenta', 'cincuenta'];
+  var HOURS = ['doce', 'una', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve', 'diez', 'once'];
+  function minuteWords(n) {
+    if (n === 21) return 'veintiún';
+    var w = n < 30 ? UNITS[n] : TENS[Math.floor(n / 10)] + (n % 10 ? ' y ' + UNITS[n % 10] : '');
+    return n % 10 === 1 && n !== 11 ? w.replace(/uno$/, 'un') : w;
+  }
+  function spokenTime(ms) {
+    var d = new Date(ms);
+    var h = d.getHours(), m = d.getMinutes();
+    var period = h < 6 ? 'de la madrugada' : h < 12 ? 'de la mañana' : h < 19 ? 'de la tarde' : 'de la noche';
+    if (h === 12 && m === 0) period = 'del día';
+    if (h === 0 && m === 0) period = 'de la noche';
+    var h12 = h % 12;
+    var lead = h12 === 1 ? 'Es la ' : 'Son las ';
+    if (m === 0) return lead + HOURS[h12] + ' ' + period + ' en punto.';
+    return lead + HOURS[h12] + ' con ' + minuteWords(m) + ' ' + (m === 1 ? 'minuto' : 'minutos') + ' ' + period + '.';
+  }
+  /* Número del minuto (si toca avisar) o null: el mismo durante todo ese minuto, para avisar una sola vez. */
+  function announceSlot(ms, everyMin) {
+    if (!(everyMin >= 1)) return null;
+    return new Date(ms).getMinutes() % everyMin === 0 ? Math.floor(ms / 60000) : null;
+  }
+
+  var api = { clockParts: clockParts, spokenTime: spokenTime, announceSlot: announceSlot, fmtTime: fmtTime, activeLine: activeLine, createHistory: createHistory, emojiSrc: emojiSrc, setEmoji: setEmoji };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Util = api;
 })(typeof window !== 'undefined' ? window : globalThis);
