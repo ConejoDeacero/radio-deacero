@@ -26,7 +26,9 @@ $args = @('--kiosk', $url, '--edge-kiosk-type=fullscreen', "--user-data-dir=$pro
 
 if ($DryRun) { Write-Host "Navegador: $browser"; Write-Host "Direccion: $url"; Write-Host "Argumentos: $($args -join ' ')"; exit 0 }
 
-$PID | Set-Content -Path (Join-Path $root 'run-kiosk.pid') -Encoding ASCII   # para que install/uninstall lo paren sin consultar procesos
+$logs = Join-Path $root 'logs'   # el PID va en logs\ (cualquier usuario puede escribir ahi) para que detener/instalar/desinstalar lo paren
+New-Item -ItemType Directory -Force -Path $logs | Out-Null
+$PID | Set-Content -Path (Join-Path $logs 'run-kiosk.pid') -Encoding ASCII
 
 # esperar al servidor (evita abrir una pagina de error al iniciar sesion)
 while ($true) {

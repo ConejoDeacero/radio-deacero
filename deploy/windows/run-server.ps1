@@ -1,8 +1,6 @@
 # run-server.ps1 - arranca el servidor y lo relanza si se cae. Lo copia install.ps1 a <InstallDir>.
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $cfg = Get-Content (Join-Path $root 'config.json') -Raw | ConvertFrom-Json
-$PID | Set-Content -Path (Join-Path $root 'run-server.pid') -Encoding ASCII   # para que install/uninstall lo paren sin consultar procesos (sin administrador no se puede)
-
 $env:PORT = [string]$cfg.port
 $env:HOST = [string]$cfg.host
 $env:DATA_DIR = Join-Path $root 'data'
@@ -11,6 +9,8 @@ $env:PATH = (Join-Path $root 'bin') + ';' + $env:PATH   # yt-dlp.exe portatil, s
 
 $logs = Join-Path $root 'logs'
 New-Item -ItemType Directory -Force -Path $logs | Out-Null
+# El PID va en logs\ (cualquier usuario puede escribir ahi, en la raiz no) para que detener/instalar/desinstalar paren el proceso sin consultar procesos.
+$PID | Set-Content -Path (Join-Path $logs 'run-server.pid') -Encoding ASCII
 $log = Join-Path $logs 'server.log'
 if ((Test-Path $log) -and ((Get-Item $log).Length -gt 5MB)) { Move-Item $log "$log.1" -Force }   # sin crecer sin limite
 

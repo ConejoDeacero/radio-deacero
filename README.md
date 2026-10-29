@@ -161,45 +161,35 @@ tar --exclude=__pycache__ -cf - yt_dlp | ssh admin@IP 'rm -rf ~/.local/lib/ytdlp
 Si la pantalla se apaga sola: `sudo raspi-config` → Display Options → Screen Blanking → No.
 El reloj de esta Pi iba ~3 h atrasado (NTP bloqueado); la app lo tolera (si una URL caduca antes de tiempo, reintenta).
 
-## Instalar en un PC con Windows (sin administrador)
+## Instalar en un PC con Windows
 
-Sirve igual que la Raspberry Pi: un PC con monitor (o solo servidor) que arranca solo al iniciar sesión.
+Sirve igual que la Raspberry Pi: un PC con monitor (o solo servidor) que arranca solo al iniciar sesión. **Los pasos, uno por uno, están en [`LEEME.txt`](LEEME.txt)**
+(se abre con el Bloc de notas). En corto:
 
-**Forma fácil (para quien tenga permisos de administrador en ese PC):** copiar el paquete (`radio-deacero-windows.zip`), descomprimirlo y hacer doble clic en
-`INSTALAR.cmd` (pide el aviso de administrador una vez). Instala para **todos los usuarios** en `C:\ProgramData\RadioDeacero`, abre la pantalla completa con la vista `/kiosco`
-(video difuminado + hora grande), abre el puerto en el firewall y muestra las direcciones y la clave. `DESINSTALAR.cmd` lo quita; `LEEME.txt` trae los pasos. El paquete lleva Node y
-`yt-dlp` incluidos en `vendor\` (verificados contra los hashes oficiales), así que instalar no necesita internet (reproducir sí). El zip se arma a partir de este repositorio añadiendo `vendor\`
-(no está versionado). Sin ser administrador se puede instalar solo para el usuario actual con `install.ps1`, como sigue. Desde la carpeta del proyecto:
+1. Bajar el zip de GitHub (*Code → Download ZIP*), copiarlo a `C:\` y descomprimirlo (queda `C:\radio-deacero-main`, que no se borra).
+2. Doble clic en **`MENU.cmd`** y elegir una opción:
 
-```powershell
-powershell -ExecutionPolicy Bypass -File deploy\windows\install.ps1
-```
-
-| Opción | Para qué |
+| Opción | Hace |
 |---|---|
-| `-View kiosco` | pantalla con el video difuminado de fondo y la hora grande (por defecto, el reproductor normal) |
-| `-Mode video` | arrancar con video (por defecto, solo música) |
-| `-NoKiosk` | solo servidor: no abre el navegador en pantalla completa |
-| `-LocalOnly` | solo ese equipo (sin control desde la red ni clave) |
-| `-Port 8000` · `-Token CLAVE` · `-InstallDir ruta` | puerto, clave del control remoto (si se omite se genera una) y carpeta (por defecto `%LOCALAPPDATA%\RadioDeacero`) |
-| `-NoAutostart` · `-NoStart` | no crear los accesos de Inicio / no arrancar al terminar (pruebas) |
+| 1 | Instalar o actualizar **para todos los usuarios** (`C:\ProgramData\RadioDeacero`; pide administrador; abre el puerto 8000 en el firewall) |
+| 2 | Instalar o actualizar **solo para el usuario actual** (`%LOCALAPPDATA%\RadioDeacero`; sin administrador) |
+| 3 | Iniciar (servidor + pantalla completa, sin esperar a reiniciar) |
+| 4 | Detener (cerrar el navegador no basta: `run-kiosk.ps1` lo reabre a los 3 s) |
+| 5 | Estado: si corre, direcciones de control y clave |
+| 6 | Desinstalar |
 
-Qué hace: usa el Node (≥ 18) y el `yt-dlp` que ya haya o descarga copias portátiles (nodejs.org y GitHub; si GitHub está bloqueado, `python -m pip install -U yt-dlp`); copia la app
-a `<carpeta>\app` y guarda podcasts e historial aparte en `<carpeta>\data`; crea dos accesos en la carpeta **Inicio** del usuario (el servidor, que se relanza solo si se cae, y la pantalla
-completa en Edge o Chrome con un perfil propio); arranca todo y muestra las direcciones y la **clave**. Los logs quedan en `<carpeta>\logs\server.log`.
+Actualizar = bajar el zip nuevo, extraerlo encima y repetir la opción 1 o 2 (conserva clave, vista, podcasts e historial).
 
-- **Bajar cambios:** `powershell -ExecutionPolicy Bypass -File "%LOCALAPPDATA%\RadioDeacero\update.ps1"` (el instalador lo copia a la carpeta de instalación). Baja el zip de la rama `main` de GitHub
-  (repo público, sin Git ni credenciales) y lo instala encima: conserva clave, puerto, vista, modo, podcasts e historial. `-UpdateYtDlp` actualiza también `yt-dlp.exe`; `-NoStart` no arranca al terminar.
-  Hay que haber subido antes los cambios a GitHub. Si el equipo no llega a GitHub, copiar el zip y ejecutar `install.ps1`.
-- **Actualizar a mano:** volver a ejecutar `install.ps1` (para el servidor viejo, pone el nuevo y conserva clave, puerto, vista y modo). **Quitar:** `uninstall.ps1` (`-KeepData` conserva podcasts e historial).
-- **Control desde otros equipos:** sin ser administrador Windows puede preguntar si permite la conexión la primera vez (aceptar), o crear la regla una vez como administrador
-  (el instalador imprime el comando; si se ejecuta ya como administrador la crea solo).
-- **Detener sin desinstalar:** `powershell -ExecutionPolicy Bypass -File "%LOCALAPPDATA%\RadioDeacero\detener.ps1"`. Cerrar el navegador no basta: `run-kiosk.ps1` lo reabre a los 3 s. Este script para el servidor y la pantalla
-  (con todo su árbol) hasta el próximo inicio de sesión; para quitarlos de forma permanente, `uninstall.ps1`.
-- **Autorun con tarea programada:** `powershell -ExecutionPolicy Bypass -File deploy\windows\autorun.ps1` crea dos tareas (`RadioDeacero-Servidor` y `RadioDeacero-Pantalla`) que
-  se lanzan al iniciar sesión el usuario actual, con una espera para que la red esté lista, y quita los accesos de Inicio para no arrancar dos veces. No pide administrador; si Windows no deja crearlas,
-  conserva los accesos de Inicio. `-Remove` quita las tareas. Para que arranque «en cuanto se prende» el PC debe iniciar sesión solo (inicio de sesión automático, lo configura IT): sin sesión no hay pantalla.
-- **Pantalla completa:** se sale con `Alt+F4`, pero se reabre sola; para pararla del todo, `uninstall.ps1` o cerrar sesión. La hora de la vista `/kiosco` es la del PC.
+Cómo está hecho (detalles para quien lo mantenga):
+- `MENU.cmd` solo llama a los programas de `deploy\windows\`: `install.ps1`, `iniciar.ps1`, `detener.ps1`, `estado.ps1`, `uninstall.ps1`; `run-server.ps1` y `run-kiosk.ps1` son los que arrancan solos
+  (accesos en la carpeta *Inicio* del usuario, o la común si se instaló para todos; el servidor se relanza solo si se cae y la pantalla se reabre si se cierra). Los textos de los `.ps1` van sin acentos
+  a propósito: PowerShell 5.1 lee mal los `.ps1` sin BOM.
+- `install.ps1` acepta `-View kiosco|normal`, `-Mode video|audio`, `-NoKiosk`, `-LocalOnly`, `-Port`, `-Token`, `-InstallDir`, `-NoAutostart`, `-NoStart`. Usa el Node (≥ 18) y el `yt-dlp` que haya o descarga
+  copias portátiles (nodejs.org y GitHub; si GitHub está bloqueado, `python -m pip install -U yt-dlp`).
+- Instalado como administrador **no arranca** la app desde esa ventana (correría con permisos de administrador y los demás usuarios no podrían pararla): el menú la arranca después con el usuario normal.
+- Node se **copia**, no se mueve, a la carpeta de instalación: mover conserva los permisos de la carpeta temporal de quien instala y el resto de usuarios no podría ejecutarlo tras reiniciar. Instalar como administrador repara los permisos de una instalación anterior.
+- Los PID de `run-server`/`run-kiosk` se guardan en `<carpeta>\logs\*.pid` (único lugar donde cualquier usuario puede escribir): así se paran sin consultar procesos (a un usuario sin administrador Windows le niega `Get-CimInstance`).
+- Para que arranque «en cuanto se prende» el PC debe iniciar sesión solo (inicio de sesión automático, lo configura TI): sin sesión no hay pantalla. La hora de la vista `/kiosco` es la del PC.
 - El comando `play` (control por terminal) necesita Python; la web `/remote` funciona sin nada más.
 
 ## Cómo funciona
@@ -230,7 +220,8 @@ src/history.js       historial           src/jsonfile.js JSON en disco (atómico
 src/lyrics.js        letras             src/thumb.js    carátulas
 public/              interfaz (HTML + CSS + JS, sin build): index.html (pantalla), remote.html (control)
 deploy/              play (CLI), start/stop-kiosk.sh, install-autostart.sh, play-lite.user.service (Raspberry Pi)
-deploy/windows/      INSTALAR.cmd, DESINSTALAR.cmd, LEEME.txt, install.ps1, uninstall.ps1, run-server.ps1, run-kiosk.ps1 (PC con Windows)
+MENU.cmd, LEEME.txt   menú y pasos para Windows
+deploy/windows/      install, iniciar, detener, estado, uninstall (.ps1) y run-server/run-kiosk (PC con Windows)
 data/genres.json     479 géneros        test/           node:test
 ```
 

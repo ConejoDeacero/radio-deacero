@@ -3,3 +3,7 @@ deploy/* text eol=lf
 *.sh text eol=lf
 *.service text eol=lf
 *.timer text eol=lf
+# Los de Windows, con CRLF: un .cmd con LF puede fallar (etiquetas y goto) y el Bloc de notas viejo no separa las líneas del LEEME
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+LEEME.txt text eol=crlf

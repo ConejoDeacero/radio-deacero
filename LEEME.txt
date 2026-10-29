@@ -1,0 +1,93 @@
+DEACERO PLAY LITE PARA WINDOWS - PASOS
+======================================
+
+Qué es: un reproductor de música aleatoria por género (YouTube). En una pantalla de sala muestra la HORA GRANDE, la fecha,
+la canción y la que sigue, con el video de fondo difuminado. Todo se controla desde otra computadora, con el navegador.
+
+Se maneja con UN solo archivo: MENU.cmd (doble clic).
+
+
+1. INSTALAR (primera vez)
+-------------------------
+  1) Bajar el zip del proyecto:
+       - Abrir en el navegador:  https://github.com/ConejoDeacero/radio-deacero
+       - Botón verde "Code"  ->  "Download ZIP".
+
+  2) Quitar el bloqueo del zip (evita avisos de seguridad):
+       - Clic derecho sobre el zip  ->  Propiedades  ->  marcar "Desbloquear"  ->  Aceptar.
+
+  3) Mover y descomprimir:
+       - Copiar el zip a  C:\
+       - Clic derecho  ->  "Extraer todo..."  ->  Extraer.
+       - Queda la carpeta  C:\radio-deacero-main
+       - ESA CARPETA SE QUEDA AHÍ: desde ella se instala, se inicia, se detiene y se desinstala. No la borres.
+
+  4) Abrir la carpeta y hacer doble clic en  MENU.cmd
+       (si Windows pregunta si quieres ejecutarlo, elegir "Ejecutar").
+
+  5) En el menú elegir:
+       1  = instalar PARA TODOS los usuarios. Pide permisos de administrador: alguien con cuenta de administrador
+            escribe sus datos en el aviso de Windows. Es lo recomendable para una pantalla compartida.
+       2  = instalar SOLO PARA MI usuario. No pide administrador.
+     Después pregunta la vista (Enter = 1, kiosco).
+
+  6) Al terminar, la opción 5 del menú muestra la dirección de control y la CLAVE. Anótalas.
+
+La primera instalación baja Node y yt-dlp de internet (nodejs.org y github.com), así que el equipo necesita salida a esos sitios.
+
+
+2. USO DIARIO (todo desde MENU.cmd)
+-----------------------------------
+  1  Instalar o actualizar para todos los usuarios
+  2  Instalar o actualizar solo para mi usuario
+  3  Iniciar        arranca el servidor y la pantalla completa ahora, sin esperar a reiniciar
+  4  Detener        para el servidor y la pantalla (ver punto 4)
+  5  Estado         dice si está corriendo, y muestra las direcciones y la clave de control
+  6  Desinstalar    quita todo (pregunta antes)
+  0  Salir
+
+Al ENCENDER el equipo la app arranca sola cuando alguien INICIA SESIÓN en Windows. Si el equipo no inicia sesión solo,
+no habrá pantalla hasta que alguien entre. Para que entre solo hay que activar el inicio de sesión automático (lo hace TI).
+
+
+3. ACTUALIZAR
+-------------
+  - Bajar el zip nuevo (paso 1 y 2), extraerlo ENCIMA de la carpeta C:\radio-deacero-main (reemplazando) y
+    en MENU.cmd elegir otra vez la misma opción de instalar (1 o 2). Conserva la clave, la vista, los podcasts y el historial.
+  - Al terminar, elegir 3 (Iniciar) si no se abrió sola.
+
+
+4. EL NAVEGADOR SE VUELVE A ABRIR SOLO
+--------------------------------------
+Es a propósito: si lo cierras, la app lo reabre a los 3 segundos para que la pantalla nunca quede en blanco.
+Para pararla de verdad (por ejemplo, para hacer otra cosa en ese equipo):  MENU.cmd -> 4 (Detener).
+Vuelve a arrancar al iniciar sesión, o con la opción 3.
+
+
+5. CONTROL REMOTO
+-----------------
+Desde otra computadora de la misma red, en el navegador:
+       http://IP-DEL-EQUIPO:8000/remote?t=CLAVE
+(la IP y la CLAVE salen en la opción 5). Ahí se cambia de canción, género, volumen, se buscan canciones y podcasts.
+La pantalla del equipo (/kiosco) es SOLO para ver: no tiene botones.
+
+
+6. SI ALGO FALLA
+----------------
+  - NO ARRANCA TRAS REINICIAR:  MENU.cmd -> 5. Si dice "DETENIDO", muestra las últimas líneas del log.
+      El log completo está en   <carpeta de instalación>\logs\server.log
+      Si dice que no puede ejecutar Node, vuelve a instalar con la opción 1 (repara los permisos).
+  - NO SE VE EL VIDEO:  el log y la consola del navegador (F12) dicen el motivo; en solo-audio la música sigue sonando.
+  - OTRA COMPUTADORA NO ENTRA AL CONTROL:  la opción 1 abre el puerto 8000 en el firewall. Con la opción 2 (sin
+      administrador) Windows puede preguntar si permite la conexión: aceptar. Las dos computadoras deben estar en la misma red.
+  - "Windows protegió su PC" al abrir MENU.cmd:  "Más información" -> "Ejecutar de todas formas" (o desbloquear el zip, paso 2).
+
+
+7. DÓNDE QUEDA TODO
+-------------------
+  Para todos los usuarios:   C:\ProgramData\RadioDeacero
+  Solo mi usuario:           %LOCALAPPDATA%\RadioDeacero      (C:\Users\TU-USUARIO\AppData\Local\RadioDeacero)
+  Dentro:  app\ (programa)   node\ y bin\ (Node y yt-dlp)   data\ (podcasts e historial)   logs\ (server.log)   config.json (puerto y clave)
+
+  Programas internos (no hace falta abrirlos, MENU.cmd los llama):  deploy\windows\
+     install.ps1  iniciar.ps1  detener.ps1  estado.ps1  uninstall.ps1  run-server.ps1  run-kiosk.ps1

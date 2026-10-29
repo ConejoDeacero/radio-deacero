@@ -45,18 +45,8 @@ function Stop-Radio {
   Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
     Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -and $_.CommandLine -like "*$leaf*" -and $_.Name -match 'powershell|node|msedge|chrome' -and ($_.CommandLine -match 'run-server|run-kiosk|server\.js|radio-kiosk-profile') } |
     ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch { } }
-  # Un usuario sin administrador no puede consultar procesos (Get-CimInstance da "Acceso denegado"): run-server/run-kiosk guardan su PID
-  # y se paran con todo su arbol (Node, navegador). Solo si el proceso ya existia cuando se escribio el archivo (descarta un PID reutilizado).
-  foreach ($n in @('run-server.pid', 'run-kiosk.pid')) {
-    $f = Join-Path $Dir $n
-    if (-not (Test-Path $f)) { continue }
-    $pidNum = 0
-    if (-not [int]::TryParse((Get-Content $f -Raw).Trim(), [ref]$pidNum)) { continue }
-    $p = Get-Process -Id $pidNum -ErrorAction SilentlyContinue
-    if ($p -and $pidNum -ne $PID -and $p.ProcessName -eq 'powershell' -and $p.StartTime -le (Get-Item $f).LastWriteTime.AddSeconds(5)) {
-      & cmd /c "taskkill /F /T /PID $pidNum >nul 2>nul"
-    }
-  }
+  # Un usuario sin administrador no puede consultar procesos (Get-CimInstance da "Acceso denegado"): se paran por el PID que guardan run-server/run-kiosk.
+  if (Test-Path (Join-Path $here 'detener.ps1')) { & (Join-Path $here 'detener.ps1') -InstallDir $Dir -SoloPorPID -Silencioso }
   Start-Sleep -Seconds 1
 }
 
@@ -102,7 +92,9 @@ if (-not $nodePath) {
     $tmp = Join-Path $env:TEMP "node-extract-$([guid]::NewGuid().ToString('N').Substring(0,8))"
     Expand-Archive -Path $zip -DestinationPath $tmp -Force
     if (Test-Path (Join-Path $InstallDir 'node')) { Remove-Item (Join-Path $InstallDir 'node') -Recurse -Force }
-    Move-Item (Join-Path $tmp "node-$ver-win-x64") (Join-Path $InstallDir 'node')
+    # COPIAR, no mover: mover conserva los permisos de la carpeta temporal de quien instala (solo el y los administradores) y los demas
+    # usuarios no podrian ejecutar Node despues de reiniciar. Copiar hereda los permisos de la carpeta de instalacion.
+    Copy-Item (Join-Path $tmp "node-$ver-win-x64") (Join-Path $InstallDir 'node') -Recurse -Force
     Remove-Item $zip, $tmp -Recurse -Force -ErrorAction SilentlyContinue
   }
   $nodePath = $portable
@@ -138,10 +130,13 @@ Step 'Copiando la aplicacion'
 $null = robocopy $source (Join-Path $InstallDir 'app') /MIR /NFL /NDL /NJH /NJS /NP /XD .git test docs node_modules vendor /XF podcasts.json history.json .gitignore .gitattributes
 if ($LASTEXITCODE -ge 8) { throw "robocopy fallo (codigo $LASTEXITCODE)" }
 Say "App copiada a $InstallDir\app"
+if ($isAdmin) {
+  # Repara permisos de una instalacion anterior: node, bin y app deben heredar los de la carpeta de instalacion (Usuarios: leer y ejecutar).
+  foreach ($d in @('node', 'bin', 'app')) { $p = Join-Path $InstallDir $d; if (Test-Path $p) { & icacls $p /reset /T /C /Q | Out-Null } }
+  Say 'Permisos de node, bin y app restablecidos (todos los usuarios pueden ejecutarlos).'
+}
 Copy-Item (Join-Path $here 'run-server.ps1') (Join-Path $InstallDir 'run-server.ps1') -Force
 Copy-Item (Join-Path $here 'run-kiosk.ps1') (Join-Path $InstallDir 'run-kiosk.ps1') -Force
-Copy-Item (Join-Path $here 'update.ps1') (Join-Path $InstallDir 'update.ps1') -Force
-Copy-Item (Join-Path $here 'detener.ps1') (Join-Path $InstallDir 'detener.ps1') -Force
 
 # ---------------------------------------------------------------- configuracion (se conserva la clave al actualizar)
 Step 'Configuracion'
@@ -160,7 +155,8 @@ if (-not $Token) {
   elseif (-not $LocalOnly) { $Token = -join ((48..57) + (65..90) + (97..122) | Get-Random -Count 20 | ForEach-Object { [char]$_ }) }
 }
 $bind = '0.0.0.0'; if ($LocalOnly) { $bind = '127.0.0.1' }
-$cfg = [ordered]@{ port = $Port; host = $bind; token = $Token; view = $View; mode = $Mode; node = $nodePath }
+if (-not $PSBoundParameters.ContainsKey('NoKiosk') -and $old -and $old.kiosk -eq $false) { $NoKiosk = [switch]$true }
+$cfg = [ordered]@{ port = $Port; host = $bind; token = $Token; view = $View; mode = $Mode; kiosk = (-not $NoKiosk); node = $nodePath }
 $cfg | ConvertTo-Json | Set-Content -Path $cfgFile -Encoding ASCII
 Say "Puerto $Port, escucha en $bind, vista '$View', modo '$Mode'"
 
@@ -177,10 +173,7 @@ function New-Startup($name, $script) {
   $sh.Save()
   Say "Acceso creado: $lnk"
 }
-& cmd /c 'schtasks /Query /TN RadioDeacero-Servidor >nul 2>nul'
-$hasTasks = ($LASTEXITCODE -eq 0)   # autorun.ps1 ya lo dejo como tarea programada: con accesos de Inicio tambien arrancaria dos veces
 if ($NoAutostart) { Say 'Omitido (-NoAutostart).' }
-elseif ($hasTasks) { Say 'Ya arranca por tarea programada (autorun.ps1): no se crean accesos de Inicio.' }
 else {
   New-Item -ItemType Directory -Force -Path $StartupDir | Out-Null
   New-Startup 'RadioDeacero-Servidor' (Join-Path $InstallDir 'run-server.ps1')
@@ -207,6 +200,10 @@ else {
 
 # ---------------------------------------------------------------- arrancar
 if ($NoStart) { Say 'No se arranca (-NoStart).' }
+elseif ($isAdmin) {
+  # Arrancado desde aqui, el servidor y la pantalla correrian con permisos de administrador y los demas usuarios no podrian pararlos.
+  Say 'Instalado como administrador: no se arranca desde esta ventana. Arrancalo con "Iniciar" desde una ventana normal (o al iniciar sesion).'
+}
 else {
   Step 'Arrancando'
   $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
@@ -231,5 +228,5 @@ if (-not $LocalOnly) {
   foreach ($ip in $ips) { Say "Desde la red:      http://${ip}:$Port/remote?t=$Token" }
   Say "Clave de control remoto: $Token"
 }
-Say "Logs: $InstallDir\logs\server.log   |   Quitar: powershell -ExecutionPolicy Bypass -File `"$here\uninstall.ps1`""
+Say "Logs: $InstallDir\logs\server.log"
 if ($LogFile) { Stop-Transcript | Out-Null }
