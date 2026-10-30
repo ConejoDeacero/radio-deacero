@@ -8,6 +8,7 @@ $cfg = Get-Content (Join-Path $root 'config.json') -Raw | ConvertFrom-Json
 $path = '/'
 if ($cfg.view -eq 'kiosco') { $path = '/kiosco' }
 $url = "http://localhost:$($cfg.port)$path`?mode=$($cfg.mode)"
+if ($cfg.estirar -gt 1) { $url += "&estirar=$($cfg.estirar)" }   # panel panoramico estirado: ver install.ps1 -Estirar
 
 $candidates = @(
   "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",

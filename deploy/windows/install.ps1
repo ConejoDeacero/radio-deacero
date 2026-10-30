@@ -16,6 +16,7 @@ param(
   [ValidateSet('normal', 'kiosco')][string]$View = 'normal',   # vista de la pantalla: reproductor normal o /kiosco (video difuminado + reloj)
   [ValidateSet('audio', 'video')][string]$Mode = 'audio',      # arranca en solo musica o con video
   [string]$Token = '',                                         # clave del control remoto (si se omite se genera una)
+  [ValidateRange(1, 4)][int]$Estirar = 1,                      # panel panoramico alimentado en 16:9 y estirado a lo ancho: 2 = el doble (las letras salen con su forma)
   [switch]$NoKiosk,        # solo servidor: no abrir el navegador en pantalla completa
   [switch]$NoAutostart,    # no crear accesos en Inicio (pruebas)
   [switch]$NoStart,        # no arrancar al terminar
@@ -148,6 +149,7 @@ if ($old) {
   if (-not $PSBoundParameters.ContainsKey('Port') -and $old.port) { $Port = [int]$old.port }
   if (-not $PSBoundParameters.ContainsKey('View') -and $old.view) { $View = [string]$old.view }
   if (-not $PSBoundParameters.ContainsKey('Mode') -and $old.mode) { $Mode = [string]$old.mode }
+  if (-not $PSBoundParameters.ContainsKey('Estirar') -and $old.estirar) { $Estirar = [int]$old.estirar }
   if (-not $PSBoundParameters.ContainsKey('LocalOnly') -and $old.host -eq '127.0.0.1') { $LocalOnly = [switch]$true }
 }
 if (-not $Token) {
@@ -156,9 +158,9 @@ if (-not $Token) {
 }
 $bind = '0.0.0.0'; if ($LocalOnly) { $bind = '127.0.0.1' }
 if (-not $PSBoundParameters.ContainsKey('NoKiosk') -and $old -and $old.kiosk -eq $false) { $NoKiosk = [switch]$true }
-$cfg = [ordered]@{ port = $Port; host = $bind; token = $Token; view = $View; mode = $Mode; kiosk = (-not $NoKiosk); node = $nodePath }
+$cfg = [ordered]@{ port = $Port; host = $bind; token = $Token; view = $View; mode = $Mode; estirar = $Estirar; kiosk = (-not $NoKiosk); node = $nodePath }
 $cfg | ConvertTo-Json | Set-Content -Path $cfgFile -Encoding ASCII
-Say "Puerto $Port, escucha en $bind, vista '$View', modo '$Mode'"
+Say "Puerto $Port, escucha en $bind, vista '$View', modo '$Mode'$(if ($Estirar -gt 1) { ", estirada x$Estirar" })"
 
 # ---------------------------------------------------------------- accesos de inicio
 Step 'Arranque automatico'
