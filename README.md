@@ -1,7 +1,7 @@
 # DEACERO Play Lite
 
 Reproductor local de música aleatoria. Cada 4–6 canciones salta a un género al azar
-(479 géneros; el azar usa los 79 destacados). Controles grandes para pantalla táctil,
+(479 géneros; el azar usa los 79 destacados). Un género que pides a mano también dura una racha de 4–6 canciones y luego vuelve la rotación sola: nada se queda fijo horas. Controles grandes para pantalla táctil,
 modo solo audio / video, letra sincronizada, visualizador, **podcasts** y **control remoto** (comando `play` y web `/remote`).
 Sin base de datos, sin login, **sin dependencias de npm**: solo Node ≥ 18 y `yt-dlp`.
 
@@ -60,7 +60,7 @@ Todo se hace también tocando. El selector de géneros tiene buscador.
 **Por terminal / SSH** — comando `play` (en la Pi: `ssh admin@IP play next`):
 
 ```
-play status                  qué suena        play genre jazz       fijar género (id o texto)
+play status                  qué suena        play genre jazz       pedir un género (id o texto)
 play next | prev             siguiente/ant.   play genres [texto]   listar / buscar géneros
 play toggle | pause | resume pausa/play       play search bad bunny tocar UNA vez una canción/artista
 play podcast radio ambulante tocar un episodio     play podcasts         podcasts guardados

@@ -7,7 +7,7 @@ const GENRES = new Set(['jazz', 'rock']);
 const v = (body) => validateCommand(body, GENRES);
 
 test('validateCommand: órdenes simples', () => {
-  for (const cmd of ['toggle', 'play', 'pause', 'next', 'prev', 'random', 'mute', 'lyrics']) {
+  for (const cmd of ['toggle', 'play', 'pause', 'next', 'prev', 'random', 'mute', 'lyrics', 'announce']) {
     assert.deepEqual(v({ cmd }), { ok: true, cmd: { cmd } }, cmd);
   }
 });

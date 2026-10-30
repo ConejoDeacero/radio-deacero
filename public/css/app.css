@@ -71,7 +71,6 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .gp-emoji { display: inline-flex; line-height: 1; }
 .gp-emoji .emo { width: 1.45em; height: 1.45em; vertical-align: 0; }
 .gp-label { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.gp-lock { width: .9em; height: .9em; color: var(--accent); }
 @keyframes pop { 0% { transform: scale(.9); } 60% { transform: scale(1.06); } 100% { transform: scale(1); } }
 
 /* ── Escenario ── */

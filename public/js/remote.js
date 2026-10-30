@@ -90,6 +90,7 @@
   $('mute').addEventListener('click', () => send({ cmd: 'mute' }));
   $('random').addEventListener('click', () => send({ cmd: 'random' }));
   $('lyrics').addEventListener('click', () => send({ cmd: 'lyrics' }));
+  $('announce').addEventListener('click', () => { send({ cmd: 'announce' }); toast('Anunciando…'); });
   $('mode').addEventListener('click', () => send({ cmd: 'mode', mode: $('modeLbl').textContent === 'Video' ? 'video' : 'audio' }));
 
   vol.addEventListener('pointerdown', () => { dragging = true; });
@@ -237,7 +238,7 @@
   /* ── equipos conectados ─────────────────────────────────────── */
   const CMD_ES = {
     next: 'Siguiente', prev: 'Anterior', toggle: 'Pausa / play', play: 'Play', pause: 'Pausa', random: 'Otro género', genre: 'Fijar género',
-    search: 'Buscar canción', track: 'Tocar episodio/canción', volume: 'Volumen', mute: 'Silenciar', mode: 'Audio / video', lyrics: 'Letra'
+    search: 'Buscar canción', track: 'Tocar episodio/canción', volume: 'Volumen', mute: 'Silenciar', mode: 'Audio / video', lyrics: 'Letra', announce: 'Anuncio'
   };
   function ago(sec) {
     if (sec < 60) return sec + ' s';

@@ -5,7 +5,7 @@
 
 const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
 const TRACK_KINDS = new Set(['search', 'podcast']);
-const SIMPLE = new Set(['toggle', 'play', 'pause', 'next', 'prev', 'random', 'mute', 'lyrics']);
+const SIMPLE = new Set(['toggle', 'play', 'pause', 'next', 'prev', 'random', 'mute', 'lyrics', 'announce']);
 
 /* Valida una orden y devuelve SOLO los campos permitidos. */
 function validateCommand(body, genreIds) {

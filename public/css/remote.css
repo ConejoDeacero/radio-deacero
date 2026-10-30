@@ -23,7 +23,7 @@ html { font-size: 16px; }
 .rem .btn-play { width: 5.5rem; height: 5.5rem; }
 .rem .btn-act { width: auto; height: auto; min-height: 4rem; font-size: .85rem; }
 .rem-transport { display: flex; justify-content: center; align-items: center; gap: 1.6rem; }
-.rem .actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.rem .actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .rem .range { height: 2.6rem; }
 
 .tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: .4rem; padding: .25rem; border-radius: var(--r-full); background: var(--mat); border: 1px solid var(--hair); }

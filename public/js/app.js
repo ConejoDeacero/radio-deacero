@@ -21,7 +21,6 @@
     current: null,      /* { track, genre, genreChanged } */
     history: U.createHistory(50),
     genres: [],
-    lockedGenre: null,
     loading: false,
     failures: 0,
     toppingUp: false,
@@ -106,7 +105,6 @@
   function renderGenre(g, changed) {
     U.setEmoji($('gpEmoji'), g.emoji || '🎵');
     $('gpLabel').textContent = g.label;
-    $('gpLock').hidden = !state.lockedGenre || g.id === 'search' || g.id === 'podcast';
     const pill = $('genrePill');
     pill.style.borderColor = g.color || '';
     if (changed) { pill.classList.remove('pop'); void pill.offsetWidth; pill.classList.add('pop'); }
@@ -198,25 +196,23 @@
     playItem(p);
   }
 
-  /* Un solo intento: si falla se avisa y se sigue con lo que suena. lock = género que se fija (o null). */
-  /* keepQueue: pauta única (búsqueda): la cola y el género fijado se quedan como estaban. */
-  async function switchTo(opts, { lock = null, keepQueue = false } = {}) {
+  /* Un solo intento: si falla se avisa y se sigue con lo que suena. */
+  /* keepQueue: pauta única (búsqueda): la cola y la racha se quedan como estaban. */
+  async function switchTo(opts, { keepQueue = false } = {}) {
     if (state.loading) return;
     state.loading = true;
-    const before = state.lockedGenre;
     setBusy(true);
     try {
       const item = await fetchNext(opts);
-      if (!keepQueue) { state.lockedGenre = lock; state.queue.length = 0; }
+      if (!keepQueue) state.queue.length = 0;
       if (state.current) state.history.push(state.current);
       playItem(item);
       topUp();
     } catch (_) {
-      state.lockedGenre = before;
       toast(opts.query ? 'No encontré resultados para esa búsqueda.' : 'No se encontró música para ese género. Prueba otro.');
     } finally { state.loading = false; setBusy(false); renderUpNext(); }
   }
-  const changeGenre = (id) => switchTo(id ? { genre: id } : { change: true }, { lock: id || null });
+  const changeGenre = (id) => switchTo(id ? { genre: id } : { change: true });
   const playQuery = (q) => switchTo({ query: q }, { keepQueue: true });
 
   /* Un episodio o canción concreta (viene del control remoto): suena ahora y la lista sigue como estaba. */
@@ -374,7 +370,7 @@
     $('sheet').hidden = false;
     $('genreFilter').value = '';
     filterChips('');
-    document.querySelectorAll('.chip').forEach((c) => c.classList.toggle('on', c.dataset.id === state.lockedGenre));
+    document.querySelectorAll('.chip').forEach((c) => c.classList.toggle('on', !!state.current && c.dataset.id === state.current.genre.id));
   }
   const closeSheet = () => { $('sheet').hidden = true; };
   function filterChips(q) {
@@ -585,6 +581,7 @@
       case 'mute': toggleMute(); break;
       case 'mode': setMode(c.mode); break;
       case 'lyrics': $('btnLyrics').click(); break;
+      case 'announce': announce(Date.now() + timeOffset, true); break;
       default: break;
     }
   }
@@ -653,8 +650,8 @@
       speechSynthesis.speak(u);
     });
   }
-  async function announce(ms) {
-    if (announcing || media.paused || media.muted) return;
+  async function announce(ms, force = false) { /* force = lo pidió alguien desde /remote: suena aunque la música esté en pausa */
+    if (announcing || (!force && (media.paused || media.muted))) return;
     announcing = true;
     try { await fadeDuck(0.12, 600); await playJingle(); await wait(250); await speak(U.spokenTime(ms)); }
     finally { await fadeDuck(1, 900); announcing = false; }

@@ -2,6 +2,7 @@
 /* radio.js — el "bot": decide qué suena y cuándo cambia de género.
  *
  * Cada 4–6 canciones salta a un género al azar (sin repetir los últimos 3).
+ * Un género pedido a mano también dura una racha de 4–6 y luego vuelve la rotación sola.
  * Las canciones salen de buscar una consulta al azar del género y se guardan en
  * un pool para no buscar en cada pista. Una sola instancia = un solo oyente. */
 
@@ -22,7 +23,7 @@ function createRadio({
   const lastGenres = [];
   let genre = null;
   let left = 0;
-  let locked = false;
+  let locked = false; /* la racha actual la pidió el usuario: si no hay música de ese género avisa en vez de saltar a otro */
   let chain = Promise.resolve();
 
   const pick = (arr) => arr[Math.floor(rng() * arr.length)];
@@ -40,7 +41,7 @@ function createRadio({
     return pick(cands.length ? cands : randomPool.filter((g) => !exclude.includes(g.id)));
   }
 
-  /* allowRepeat: un género fijado por horas agota sus canciones nuevas; entonces
+  /* allowRepeat: un género pedido a mano puede agotar sus canciones nuevas; entonces
    * se repiten las antiguas en vez de fallar. */
   async function takeTrack(g, allowRepeat = false) {
     const fresh = (list) => (allowRepeat ? list : list.filter((t) => !recent.has(t.id)));
@@ -89,11 +90,11 @@ function createRadio({
       const g = byId.get(wanted);
       if (!g) throw err('UNKNOWN_GENRE', `Género desconocido: ${wanted}`);
       if (!locked || genre !== g) switched = true;
-      genre = g; locked = true; left = Infinity;
+      genre = g; locked = true; left = between(perGenre); switched = true; /* racha nueva, como las automáticas */
     } else if (change) {
       locked = false; genre = null;
     }
-    if (!locked && (!genre || left <= 0)) { genre = randomGenre(); left = between(perGenre); switched = true; }
+    if (!genre || left <= 0) { locked = false; genre = randomGenre(); left = between(perGenre); switched = true; }
 
     const tried = [];
     for (;;) {
@@ -102,10 +103,10 @@ function createRadio({
         if (switched) { lastGenres.push(genre.id); if (lastGenres.length > 20) lastGenres.shift(); }
         remember(track.id);
         /* Una mezcla de horas cuenta como la "racha" completa del género. */
-        left = !locked && track.duration > SONG_MAX_SEC ? 0 : left - 1;
-        return { track, genre: pub(genre), genreChanged: switched, genreLeft: Number.isFinite(left) ? Math.max(left, 0) : null };
+        left = track.duration > SONG_MAX_SEC ? 0 : left - 1;
+        return { track, genre: pub(genre), genreChanged: switched, genreLeft: Math.max(left, 0) };
       }
-      /* Un género fijado por el usuario no salta solo a otro. */
+      /* Un género pedido por el usuario no salta solo a otro: se avisa. */
       if (locked) throw err('NO_SOURCE', `Sin resultados para ${genre.label}`);
       tried.push(genre.id);
       if (tried.length >= 3) throw err('NO_SOURCE', 'Ningún género devolvió canciones');

@@ -5,7 +5,7 @@
   play next | prev             siguiente / anterior
   play toggle | pause | resume pausa / play
   play random                  cambiar a otro género al azar
-  play genre jazz              fijar un género (id exacto o texto; si hay varios los lista)
+  play genre jazz              pedir un género (id exacto o texto; si hay varios los lista): suena una racha y sigue la rotación
   play genres [texto]          listar / buscar géneros
   play search bad bunny        tocar una canción o artista UNA vez (la lista sigue como iba)
   play podcast radio ambulante tocar el primer episodio que aparezca (una vez; la lista sigue)

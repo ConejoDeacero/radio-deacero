@@ -67,27 +67,45 @@ test('marca genreChanged y genreLeft', async () => {
   assert.deepEqual(rs.slice(0, 4).map((r) => r.genreLeft), [3, 2, 1, 0]);
 });
 
-test('género fijo con catálogo agotado: repite canciones antiguas en vez de fallar', async () => {
+test('género pedido con catálogo agotado: repite canciones antiguas en vez de fallar durante su racha', async () => {
   const search = async () => [{ id: 'x1', title: 'A', channel: 'C', duration: 200 }, { id: 'x2', title: 'B', channel: 'C', duration: 200 }];
-  const radio = createRadio({ genres: mkGenres(3), search, rng: seeded() });
+  const radio = createRadio({ genres: mkGenres(3), search, rng: seeded(), perGenre: [7, 7] });
   const rs = await take(radio, 7, { genre: 'g1' });
   assert.equal(rs.length, 7);
   assert.ok(rs.every((r) => r.genre.id === 'g1'));
 });
 
-test('genre fijo: se queda en ese género hasta pedir cambio', async () => {
-  const radio = createRadio({ genres: mkGenres(6), search: mkEndlessSearch(), rng: seeded() });
+test('género pedido a mano: dura una racha (como los automáticos) y luego vuelve a rotar solo', async () => {
+  const radio = createRadio({ genres: mkGenres(6), search: mkEndlessSearch(), rng: seeded(), perGenre: [4, 4] });
   const first = await radio.next({ genre: 'g2' });
   assert.equal(first.genre.id, 'g2');
   assert.equal(first.genreChanged, true);
-  const more = await take(radio, 15);
-  assert.ok(more.every((r) => r.genre.id === 'g2'), 'sigue en g2 aunque pasen más de 6');
+  assert.equal(first.genreLeft, 3);
+  const rest = await take(radio, 3);
+  assert.ok(rest.every((r) => r.genre.id === 'g2' && !r.genreChanged), 'las otras 3 de la racha siguen en g2');
+  const next = await radio.next();
+  assert.notEqual(next.genre.id, 'g2', 'terminada la racha vuelve la rotación automática');
+  assert.equal(next.genreChanged, true);
+  const after = await take(radio, 20);
+  assert.ok(new Set(after.map((r) => r.genre.id)).size >= 2, 'y sigue rotando');
+});
 
-  const changed = await radio.next({ change: true });
-  assert.notEqual(changed.genre.id, 'g2');
-  assert.equal(changed.genreChanged, true);
-  const after = await take(radio, 12);
-  assert.ok(new Set(after.map((r) => r.genre.id)).size >= 2, 'vuelve a rotar solo');
+test('género pedido a mano: la racha dura entre 4 y 6 canciones', async () => {
+  for (const seed of [1, 2, 3, 4, 5, 6]) {
+    const radio = createRadio({ genres: mkGenres(8), search: mkEndlessSearch(), rng: seeded(seed) });
+    const rs = await take(radio, 12, { genre: 'g3' });
+    const n = rs.findIndex((r) => r.genre.id !== 'g3');
+    assert.ok(n >= 4 && n <= 6, `racha de ${n} con semilla ${seed}`);
+  }
+});
+
+test('pedir el mismo género que ya suena empieza una racha nueva', async () => {
+  const radio = createRadio({ genres: mkGenres(6), search: mkEndlessSearch(), rng: seeded(), perGenre: [4, 4] });
+  await radio.next({ genre: 'g2' });
+  await take(radio, 2);
+  const again = await radio.next({ genre: 'g2' });
+  assert.equal(again.genre.id, 'g2');
+  assert.equal(again.genreLeft, 3, 'racha completa otra vez');
 });
 
 test('género desconocido → error UNKNOWN_GENRE', async () => {
@@ -154,13 +172,15 @@ test('query: es una pauta única — no altera el género ni la racha; la lista 
   assert.equal(again.track.id, 'bb2', 'no repite la que ya sonó');
 });
 
-test('query con un género fijado: sigue fijado después', async () => {
+test('query durante una racha pedida: la racha sigue donde iba y luego rota', async () => {
   const search = async (q) => (q === 'x' ? [{ id: 'x1', title: 'X', channel: 'C', duration: 200 }] : mkEndlessSearch()(q));
-  const radio = createRadio({ genres: mkGenres(5), search, rng: seeded(8) });
+  const radio = createRadio({ genres: mkGenres(5), search, rng: seeded(8), perGenre: [4, 4] });
   await radio.next({ genre: 'g2' });
   await radio.next({ query: 'x' });
-  const after = await take(radio, 6);
-  assert.ok(after.every((r) => r.genre.id === 'g2'));
+  const rest = await take(radio, 3);
+  assert.ok(rest.every((r) => r.genre.id === 'g2'), 'las 3 que faltaban de la racha');
+  const next = await radio.next();
+  assert.notEqual(next.genre.id, 'g2', 'después rota');
 });
 
 test('query sin resultados → NO_SOURCE y no altera el estado', async () => {
@@ -178,7 +198,7 @@ test('si fijar un género falla, el radio conserva el estado anterior', async ()
   const first = await radio.next({ genre: 'g1' });
   await assert.rejects(radio.next({ genre: 'g2' }), (e) => e.code === 'NO_SOURCE');
   const after = await radio.next();
-  assert.equal(after.genre.id, first.genre.id, 'sigue fijado en g1');
+  assert.equal(after.genre.id, first.genre.id, 'sigue en g1 (su racha no se perdió)');
   assert.equal(after.genreChanged, false);
 });
 
